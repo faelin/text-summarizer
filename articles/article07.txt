@@ -1,0 +1,9 @@
+What makes music beautiful? The best compositions transcend culture and time -- but what is the commonality which underscores their appeal?
+
+New research published in BioMed Central's open access journal BMC Research Notes suggests that the brain simplifies complex patterns, much in the same way that 'lossless' music compression formats reduce audio files, by removing redundant data and identifying patterns.
+
+There is a long held theory that the subconscious mind can recognise patterns within complex data and that we are hardwired to find simple patterns pleasurable. Dr Nicholas Hudson used 'lossless' music compression programs to mimic the brain's ability to condense audio information. He compared the amount of compressibility of random noise to a wide range of music including classical, techno, rock, and pop, and found that, while random noise could only be compressed to 86% of its original file size, and techno, rock, and pop to about 60%, the apparently complex Beethoven's 3rd Symphony compressed to 40%.
+
+Dr Nicholas Hudson says "Enduring musical masterpieces, despite apparent complexity, possess high compressibility" and that it is this compressibility that we respond to. So whether you are a die hard classicist or a pop diva it seems that we chose the music we prefer, not by simply listening to it, but by calculating its compressibility.
+
+For a composer -- if you want immortality, write music which sounds complex but that, in terms of its data, is reducible to simple patterns.

@@ -1,0 +1,27 @@
+Scientists at the University of Cambridge have managed to create a structure resembling a mouse embryo in culture, using two types of stem cells -- the body's 'master cells' -- and a 3D scaffold on which they can grow.
+
+Understanding the very early stages of embryo development is of interest because this knowledge may help explain why more than two out of three human pregnancies fail at this time.
+
+Once a mammalian egg has been fertilised by a sperm, it divides multiple times to generate a small, free-floating ball of stem cells. The particular stem cells that will eventually make the future body, the embryonic stem cells (ESCs) cluster together inside the embryo towards one end: this stage of development is known as the blastocyst. The other two types of stem cell in the blastocyst are the extra-embryonic trophoblast stem cells (TSCs), which will form the placenta; and primitive endoderm stem cells that will form the so-called yolk sac, ensuring that the fetus's organs develop properly and providing essential nutrients.
+
+Previous attempts to grow embryo-like structures using only ESCs have had limited success. This is because early embryo development requires the different types of cell to coordinate closely with each other.
+
+However, in a study published today in the journal Science, Cambridge researchers describe how, using a combination of genetically-modified mouse ESCs and TSCs, together with a 3D scaffold known as an extracellular matrix, they were able to grow a structure capable of assembling itself and whose development and architecture very closely resembled the natural embryo.
+
+"Both the embryonic and extra-embryonic cells start to talk to each other and become organised into a structure that looks like and behaves like an embryo," explains Professor Magdalena Zernicka-Goetz from the Department of Physiology, Development and Neuroscience, who led the research. "It has anatomically correct regions that develop in the right place and at the right time."
+
+Professor Zernicka-Goetz and colleagues found a remarkable degree of communication between the two types of stem cell: in a sense, the cells are telling each other where in the embryo to place themselves.
+
+"We knew that interactions between the different types of stem cell are important for development, but the striking thing that our new work illustrates is that this is a real partnership -- these cells truly guide each other," she says. "Without this partnership, the correct development of shape and form and the timely activity of key biological mechanisms doesn't take place properly."
+
+Comparing their artificial 'embryo' to a normally-developing embryo, the team was able to show that its development followed the same pattern of development. The stem cells organise themselves, with ESCs at one end and TSCs at the other. A cavity opens then up within each cluster before joining together, eventually to become the large, so-called pro-amniotic cavity in which the embryo will develop.
+
+While this artificial embryo closely resembles the real thing, it is unlikely that it would develop further into a healthy fetus, say the researchers. To do so, it would likely need the third form of stem cell, which would allow the development of the yolk sac, which provides nourishment for the embryo and within which a network of blood vessel develops. In addition, the system has not been optimised for the correct development of the placenta.
+
+Professor Zernicka-Goetz recently developed a technique that allows blastocysts to develop in vitro beyond the implantation stage, enabling researchers to analyse for the first time key stages of human embryo development up to 13 days after fertilisation. She believes that this latest development could help them overcome one of the main barriers to human embryo research: a shortage of embryos. Currently, embryos are developed from eggs donated through IVF clinics.
+
+"We think that it will be possible to mimic a lot of the developmental events occurring before 14 days using human embryonic and extra-embryonic stem cells using a similar approach to our technique using mouse stem cells," she says. "We are very optimistic that this will allow us to study key events of this critical stage of human development without actually having to work on embryos. Knowing how development normally occurs will allow us to understand why it so often goes wrong."
+
+The research was largely funded by the Wellcome Trust and the European Research Council.
+
+Dr Andrew Chisholm, Head of Cellular and Developmental Science at Wellcome, said: "This is an elegant study creating a mouse embryo in culture that gives us a glimpse into the very earliest stages of mammalian development. Professor Zernicka-Goetz's work really shows the importance of basic research in helping us to solve difficult problems for which we don't have enough evidence for yet. In theory, similar approaches could one day be used to explore early human development, shedding light on the role of the maternal environment in birth defects and health."
