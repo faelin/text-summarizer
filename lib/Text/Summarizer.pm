@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 
-package Text::Summarize;
+package Text::Summarizer;
 
 use v5.10;
 use strict;
