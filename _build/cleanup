@@ -1,0 +1,5 @@
+do{ my $x = {
+       'Text-Summarizer-0' => 1,
+       'Text::Summarizer-*' => 1
+     };
+$x; }

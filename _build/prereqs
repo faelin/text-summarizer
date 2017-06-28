@@ -1,0 +1,18 @@
+do{ my $x = {
+       'build_requires' => {
+                             'Carp' => 0,
+                             'Data::Dumper' => 0,
+                             'Test::More' => 0
+                           },
+       'conflicts' => {},
+       'recommends' => {},
+       'requires' => {
+                       'Data::Dumper' => 0,
+                       'Lingua::Sentence' => '1.100',
+                       'List::AllUtils' => 0,
+                       'Moo' => '2.003002',
+                       'Types::Standard' => 0
+                     },
+       'test_requires' => {}
+     };
+$x; }
