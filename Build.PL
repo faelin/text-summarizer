@@ -27,6 +27,7 @@ my $builder = Module::Build->new(
             repository  => 'https://github.com/faelin/text-summarizer/tree/master'
         },
     },
+    configure_requires => { 'Module::Build' => 0.42 }
 );
 
 $builder->create_build_script();
