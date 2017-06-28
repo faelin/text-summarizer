@@ -1,4 +1,7 @@
 #!/usr/bin/env perl
 use Text::Summarizer;
 
-my $Summarizer = GT::MHarvester->new
+my $summarizer = Text::Summarizer->new;
+
+$summarizer->scan_all;
+$summarizer->summarize_all;
