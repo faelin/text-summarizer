@@ -5,7 +5,7 @@ use Module::Build;
 my $builder = Module::Build->new(
     module_name         => 'Text::Summarizer',
     license             => 'perl',
-    dist_author         => 'Faelin McCaley <faelin.mccaley@gmail.com>',
+    dist_author         => 'Faelin Landy <faelin.landy@gmail.com>',
     dist_version_from   => 'lib/Text/Summarizer.pm',
     dist_abstract	    => 'Extract Repeated Phrases from Text',
     build_requires => {
@@ -14,8 +14,8 @@ my $builder = Module::Build->new(
         'Carp'         => 0,
     },
     requires => {
-        'Lingua::Sentence'  => 0,
-        'Moo'               => 0,
+        'Lingua::Sentence'  => '1.100',
+        'Moo'               => '2.003002',
         'Types::Standard'   => 0,
         'List::AllUtils'    => 0,
         'Data::Dumper'      => 0,
