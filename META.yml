@@ -18,7 +18,7 @@ name: Text-Summarizer
 provides:
   Text::Summarizer:
     file: lib/Text/Summarizer.pm
-    version: '0.01'
+    version: '0.02'
 requires:
   Data::Dumper: '0'
   Lingua::Sentence: '1.100'

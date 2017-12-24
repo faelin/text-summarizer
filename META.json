@@ -39,7 +39,7 @@
    "provides" : {
       "Text::Summarizer" : {
          "file" : "lib/Text/Summarizer.pm",
-         "version" : "0.01"
+         "version" : "0.02"
       }
    },
    "release_status" : "stable",
