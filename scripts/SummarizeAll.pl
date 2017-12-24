@@ -2,10 +2,10 @@
 use Text::Summarizer;
 
 my $summarizer = Text::Summarizer->new(
-		articles_path => 'tickets/*',
-		permanent_path => 'data/summarizer/permanent.stop',
-		stopwords_path => 'data/summarizer/stopwords.stop',
-		watchlist_path => 'data/summarizer/watchlist.stop',
+		articles_path => 'articles/*',
+		permanent_path => 'data/permanent.stop',
+		stopwords_path => 'data/stopwords.stop',
+		watchlist_path => 'data/watchlist.stop',
 	);
 
 # $summarizer->scan_all;
