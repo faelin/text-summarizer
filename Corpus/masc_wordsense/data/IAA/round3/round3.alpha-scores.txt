@@ -1,0 +1,12 @@
+word	alpha
+----	-----
+chance-n	0.684
+cool-j		0.694
+familiar-j	0.630
+forget-v	0.689
+juice-n		0.567
+justify-v	0.502
+player-n	0.971
+rapid-j		-0.03
+rip-v		0.477
+try-v		0.715

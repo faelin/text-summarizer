@@ -1,0 +1,15 @@
+word	alpha
+----	-----
+curious-j	0.941
+entitle-v	1.000
+exercise-n	0.400
+exercise-v	0.504
+mature-v	0.714
+maturity-n	0.556
+officer-n	0.703
+rate-n		0.566
+smart-j		-0.01
+succeed-v	0.822
+succession-n	0.345
+success-n	0.403
+suspicious-j	0.320
