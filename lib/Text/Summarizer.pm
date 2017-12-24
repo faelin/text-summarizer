@@ -469,7 +469,7 @@ sub pretty_printer {
 	my %inter_sorted;
 	for my $phrase (sort { $self->inter_hash->{$b} <=> $self->inter_hash->{$a} } keys %{$self->inter_hash}) {
 		$inter_sorted{$_} += $self->inter_hash->{$phrase} for split " ", $phrase;
-		say "\t$phrase => " . $self->inter_hash->{$phrase};
+		say "\t$phrase => " . ($self->inter_hash->{$phrase} + 1);
 	} 
 	say "\n";
 
