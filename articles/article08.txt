@@ -1,0 +1,29 @@
+SAN FRANCISCO — Yahoo’s top lawyer, Ronald S. Bell, resigned Wednesday, and its chief executive, Marissa Mayer, lost her 2016 bonus after a board investigation of the 2014 theft of information on more than 500 million user accounts.
+
+Senior executives, company lawyers and information security staff were aware of the hack in 2014 and also knew about subsequent attempts to break into the affected accounts in 2015 and 2016, but failed to “properly comprehend or investigate” the situation, the company’s board of directors said in a securities filing on Wednesday.
+
+The board “did not conclude that there was an intentional suppression of relevant information.”
+
+Those hackers, which Yahoo believes were connected to a foreign government, used the stolen information to forge a type of software called a cookie that could be used to access 32 million Yahoo accounts, the company said.
+
+Ms. Mayer, who will also give up her 2017 equity compensation in connection with the incident, said in a statement that she did not learn of the breach until September 2016, when Yahoo first disclosed the hack to the public. “However, I am the C.E.O. of the company and since this incident happened during my tenure, I have agreed to forgo my annual bonus and my annual equity grant this year,” she wrote.
+
+Under Ms. Mayer’s employment agreement, her annual target bonus is $2 million a year and her annual stock award is supposed to be no less than $12 million a year. Her base salary is $1 million a year.
+
+The company’s filing, which it said concluded its investigation, avoided naming any individuals responsible for Yahoo’s security woes, and it left many important questions unanswered.
+
+The board offered no new information about the company’s apparent failure to notice a separate theft in 2013 of the account information of one billion users.
+
+That theft — which was discovered last year by an outside security expert who noticed the information for sale on the black market — was so serious that Yahoo forced all affected users to reset their passwords. “We have not been able to identify the intrusion associated with this theft,” the board 
+
+Yahoo is eager to put the incidents behind it and move forward with the sale of its internet operations to Verizon Communications. Last week, the companies announced that they had renegotiated the deal because of the breaches, shaving $350 million from the price, and they hope to close the transaction by the end of June.
+
+Mr. Bell, a longtime lawyer at Yahoo, appears to be taking the blame for the company’s security failures. Yahoo said he resigned on Wednesday and would receive no payments in connection with his departure. The company’s chief information security officer at the time of the 2014 breach, Alex Stamos, left for Facebook in 2015 after repeated battles with Ms. Mayer over security priorities.
+
+Yahoo said that 43 consumer class-action lawsuits related to the breaches have been filed against the company in federal, state and foreign courts. It also faces a stockholder class-action suit.
+
+The company said that it is also cooperating with federal, state and foreign government officials and agencies seeking information about the incidents, including the Securities and Exchange Commission, the Federal Trade Commission, the United States attorney’s office for the Southern District of New York and two state attorneys general.
+
+Yahoo said it had revised its procedures for responding to cybersecurity incidents, including the reporting of such incidents to senior executives and the board.
+
+The company has incurred $16 million in direct costs so far related to the breaches.

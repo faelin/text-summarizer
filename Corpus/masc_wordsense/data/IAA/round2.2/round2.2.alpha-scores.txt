@@ -1,0 +1,13 @@
+word	alpha
+----	-----
+fair-j.5ann	0.541
+know-v.5ann	0.377
+land-n.6ann	0.493
+long-j.6ann	0.669
+quiet-j.6ann	0.493
+say-v.6ann	0.377
+show-v.5ann	0.456
+tell-v.5ann	0.453
+tell-v.6ann	0.459
+time-n.5ann	0.683
+work-n.5ann	0.624
