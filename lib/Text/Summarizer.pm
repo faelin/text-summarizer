@@ -1,35 +1,35 @@
 package Text::Summarizer;
 
-our $VERSION = "0.01";
+our $VERSION = "0.02";
 
 use v5.10;
 use strict;
 use warnings;
-use utf8;
 use Lingua::Sentence;
 use Moo;
-use Types::Standard qw/ Ref Str Int /;
+use Types::Standard qw/ Ref Str Int InstanceOf /;
 use List::AllUtils qw/ max min sum /;
 use Data::Dumper;
 
+use Benchmark ':hireswallclock';
 
 
 has permanent_path => (
 	is  => 'ro',
 	isa => Str,
-	default => 'words/permanent.stop',
+	default => 'data/permanent.stop',
 );
 
 has stopwords_path => (
 	is  => 'ro',
 	isa => Str,
-	default => 'words/stopwords.stop',
+	default => 'data/stopwords.stop',
 );
 
 has watchlist_path => (
 	is  => 'ro',
 	isa => Str,
-	default => 'words/watchlist.stop'
+	default => 'data/watchlist.stop'
 );
 
 has articles_path => (
@@ -50,6 +50,29 @@ has watch_coef => (
 	default => 30,
 );
 
+has phrase_list => (
+	is => 'rwp',
+	isa => Ref['HASH'],
+);
+
+has phrase_size => (
+	is => 'rwp',
+	isa => Int,
+	default => 5,
+);
+
+has phrase_small => (
+	is => 'rwp',
+	isa => Int,
+	default => 3,
+);
+
+has phrase_min => (
+	is => 'rwp',
+	isa => Int,
+	default => 100,
+);
+
 has watchlist => (
 	is => 'rwp',
 	isa => Ref['HASH'],
@@ -65,11 +88,6 @@ has stopwords => (
 );
 
 has full_text => (
-	is => 'rwp',
-	isa => Str,
-);
-
-has multi_str => (
 	is => 'rwp',
 	isa => Str,
 );
@@ -189,15 +207,32 @@ sub scan_all {
 sub summarize_file {
 	my ($self, $filepath) = @_;
 
-	open( my $file, "<", $filepath )
+	open( my $file, '<', $filepath )
 		or die "Can't open $filepath: $!";
 
 	say "\nSummary of file $filepath";
+
+			my $t1 = Benchmark->new;
 	$self->split( $file );
+			my $t2 = Benchmark->new;
+			my $td1 = timediff($t2, $t1);
+			say "\t SPLIT: ",timestr($td1);
 	$self->analyze_frequency;
+			my $t3 = Benchmark->new;
+			my $td2 = timediff($t3, $t2);
+			say "\t  FREQ: ",timestr($td2);
 	$self->analyze_clusters;
+			my $t4 = Benchmark->new;
+			my $td3 = timediff($t4, $t3);
+			say "\t CLUST: ",timestr($td3);
 	$self->analyze_phrases;
+			my $t5 = Benchmark->new;
+			my $td4 = timediff($t5, $t4);
+			say "\tPHRASE: ",timestr($td4);
+
 	$self->pretty_printer;
+
+
 
 	return $self;
 }
@@ -292,22 +327,16 @@ sub store_stoplist {
 sub split {
 	my ( $self, $file ) = @_;
 
-	$self->_set_full_text( join "" => map { chomp; $_ } <$file> );
-
-	#module for seperating sentences
-	my $splitter = Lingua::Sentence->new("en");
-	my $multistring = lc $splitter->split( $self->full_text );
-
-	$multistring =~ s/(\.”|")\s/$1\n/g;
-		#manual split — splitter does not work on infix periods (within quotations)
-	my @sentences = split /\n/, $multistring;
+	my $full_text = lc join "\n" => map { $_ } <$file>;
+		#contains the full body of text
+	my @sentences = split /(?| (?:(?<!\ )(?<= \.|\!|\?) \s+\n?) | \s{3,} | \s*\n\s* | (?: (?<![A-Za-z0-9-]) > \s+)+ | (?: ^\s+$ ) | (?: ^$) )/mx, $full_text;
 		#create array of sentences
-	my @splitwords = split /\s+|\n+|—|–/, $multistring;
+	my @word_list = split /[^A-Za-z0-9'’\-]+/, $full_text;
 		#create array of every word in order
 
-	$self->_set_multi_str( $multistring );
-	$self->_set_sentences( \@sentences  );
-	$self->_set_word_list( \@splitwords );
+	$self->_set_full_text( $full_text  );
+	$self->_set_sentences( \@sentences );
+	$self->_set_word_list( \@word_list );
 
 	return $self;
 }
@@ -326,9 +355,9 @@ sub analyze_frequency {
 			$frequency{$_}++ if length $_ >= $min_length and not $self->stopwords->{$_};
 		}
 	}
-	my $min_freq = int($wordcount*40/10000) or 1;
-	grep { delete $frequency{$_} if $frequency{$_} < $min_freq } keys %frequency;
-		#remove words that appear less than the $min_freq (defaults to 1)
+	my $min_freq_threshold = int($wordcount*40/10000) or 1;
+	grep { delete $frequency{$_} if $frequency{$_} < $min_freq_threshold } keys %frequency;
+		#remove words that appear less than the $min_freq_threshold (defaults to 1)
 
 	$self->_set_freq_hash( \%frequency );
 
@@ -342,31 +371,29 @@ sub analyze_clusters {
 
 	my $cluster_count;
 	my %cluster_hash;
-	for my $index (0..scalar @{$self->sentences} - 1) {
-		my @sen_words = split /[^A-Za-z'’\-]+/, $self->sentences->[$index];
+	for my $sentence (0..scalar @{$self->sentences} - 1) {
+		my @sen_words = split /[^A-Za-z0-9'’\-]+/, $self->sentences->[$sentence];
 
-		for my $pos (0..scalar @sen_words - 1) {
-			$cluster_count++;
-			for my $f_word (keys %{$self->freq_hash}) {
-				if (($sen_words[$pos]) =~ /\A$f_word\Z/) {
-					my @array;
-
-					push @array, $_ for (@{$cluster_hash{$f_word}}, [$index, $pos, $cluster_count]);
-					$cluster_hash{$f_word} = \@array;
+		for my $f_word (keys %{$self->freq_hash}) {
+			for my $position (0..scalar @sen_words - 1) {
+				$cluster_count++;
+				if ( $sen_words[$position] =~ /\A$f_word\Z/) {
+					my %word;
+					@word{ qw/ sen pos all / } = ( $sentence, $position, $cluster_count );
+					push @{$cluster_hash{$f_word}} => \%word;
 				}
 			}
 		}
 	}
 	$self->_set_cluster_hash( \%cluster_hash );
 
-
 	my $squaresum;
 	my $sum;
 	my %sigma_hash;
 	for my $f_word (keys %{$self->cluster_hash}) {
 		for my $f_vector (@{$self->cluster_hash->{$f_word}}) {
-			$squaresum += $$f_vector[2]**2;
-			$sum += $$f_vector[2];
+			$squaresum += $f_vector->{all}**2;
+			$sum += $f_vector->{all};
 		}
 		my $sigma = sqrt( ($squaresum - $sum**2 / $cluster_count) / $cluster_count );	#pop. std. deviation
 		$sigma_hash{$f_word} = int( $sigma / 20 );
@@ -382,82 +409,50 @@ sub analyze_clusters {
 sub analyze_phrases {
 	my $self = shift;
 
-	my $size = 3;
-	my @all_words = split /[^A-Za-z'’\-]+/, $self->multi_str;
+	my $size = $self->phrase_size;
 	my %phrase_hash;
 	for my $f_word (keys %{$self->cluster_hash}) {
 		for my $f_vector (@{$self->cluster_hash->{$f_word}}) {
-			my $index = $$f_vector[2] - 1;
-			my @array;
-			my @phrases = grep { !$self->stopwords->{$_} if $_ } @all_words[ ($index - $size) .. ($index + $size) ];
-			push @array, $_ for ( @{$phrase_hash{$f_word}}, \@phrases );
-			$phrase_hash{$f_word} = \@array;
+			my $position = $f_vector->{pos};
+			my $sentence = $self->sentences->[$f_vector->{sen}];
+			my @tokens   = split /[^A-Za-z0-9'’\-]+/ => $sentence;
+
+			my @phrases = grep { $self->stopwords->{$_} ? "[A-Za-z0-9'’\\-]+" : '$_' }
+					@tokens[  max( $position - $size => 0 ) .. min( $position + $size => scalar @tokens - 1 ) ];
+
+			unshift @phrases => $sentence;
+			push @{$phrase_hash{$f_word}} => \@phrases;
 		}
 	}
 	$self->_set_phrase_hash( \%phrase_hash );
 
+
+		open( my $text_file, '<', "data/ts_stopwords.stop" )
+			or die "Can't open data/ts_stopwords.stop: $!";
+		my %stopwords = map { chomp; ($_ => 1) } <$text_file>;
+		close $text_file;
+
+
+	my $threshold = $self->phrase_min;
+	my $text = join ' ' => @{$self->word_list};
 	my %inter_hash;
+	my %phrase_list;
 	KEYWORD: for my $f_word (keys %{$self->phrase_hash}) {
-		OUTER: for ( my $o = 0; $o < scalar @{$self->phrase_hash->{$f_word}}; $o++ ) {
-			INNER: for ( my $i = $o + 1; $i < scalar @{$self->phrase_hash->{$f_word}}; $i++ ) {
-				my $outer = @{$self->phrase_hash->{$f_word}}[$o];
-				my $inner = @{$self->phrase_hash->{$f_word}}[$i];
-				grep { $inter_hash{$_}++ if /\w+( \w+)+/ } intersect( $outer, $inner );
-					#add phrase if it contains multiple words
-			}
+		PHRASE: for my $phrase ( @{$self->phrase_hash->{$f_word}} ) {
+			my @words = split /[^A-Za-z0-9-']+/ => shift @$phrase;
+
+			my $sentence = join ' ' => @words;
+			next PHRASE unless scalar @$phrase >= $self->phrase_small;
+
+			$phrase = join ' ' => @$phrase;
+			$inter_hash{$phrase}++ and $phrase_list{$sentence}++ for ( $text =~ /$phrase/g );
 		}
 	}
+	delete $inter_hash{$_} for grep { $inter_hash{$_} < $threshold } keys %inter_hash;
 	$self->_set_inter_hash( \%inter_hash );
+	$self->_set_phrase_list( \%phrase_list );
 
 	return $self;
-}
-
-
-
-sub intersect {
-	my ($Lref, $Rref) = (@_);
-
-	my @Llist = @$Lref;
-	my @Rlist = @$Rref;
-
-	my @intersection;
-	PHRASE: for ( my $o = -1; $o < scalar @Rlist; $o++ ) {
-		my @phrase;
-
-		RWORD: for ( my $i = $o + 1; $i < scalar @Rlist; $i++ ) {
-			next PHRASE unless contains( \@Llist => [ @phrase, $Rlist[$i] ] );
-			push @phrase => $Rlist[$i];
-		}
-		
-		push @intersection, join( " " => @phrase );
-	}
-
-	return @intersection;
-}
-
-
-
-sub contains {
-	my ($Lref, $Rref) = @_;
-	my @Llist = @$Lref;
-	my @Rlist = @$Rref;
-
-	my $match;
-	LWORD: for ( my $o = 0; $o < scalar @Llist; $o++ ) {
-		$match = 0;
-
-		RWORD: for ( my $i = 0; $i < scalar @Rlist; $i++ ) {
-			next LWORD unless defined $Llist[$o+$i] and $Llist[$o+$i] eq $Rlist[$i];
-
-			$DB::single = 1;
-
-			$match++;
-		}
-
-		last LWORD;
-	}
-
-	return $match;
 }
 
 
@@ -466,24 +461,26 @@ sub pretty_printer {
 	my $self = shift;
 
 	say "PHRASES:";
-	my %inter_sorted;
 	for my $phrase (sort { $self->inter_hash->{$b} <=> $self->inter_hash->{$a} } keys %{$self->inter_hash}) {
-		$inter_sorted{$_} += $self->inter_hash->{$phrase} for split " ", $phrase;
 		say "\t$phrase => " . $self->inter_hash->{$phrase};
 	} 
 	say "\n";
 
 	my %sort_list;
 	for (keys %{$self->freq_hash}) {
-		$sort_list{$_} += $self->freq_hash->{$_} // 0;
+		$sort_list{$_} += $self->freq_hash->{$_}  // 0;
 		$sort_list{$_} += $self->sigma_hash->{$_} // 0;
-		$sort_list{$_} += $inter_sorted{$_} // 0;
+		$sort_list{$_} += $self->inter_hash->{$_} // 0;
 	}
 
 	say "WORDS:";
-	my $string = "%" . $self->max_word . "s|%s%s%s\n";
-	printf( $string, ( $_,"-"x$self->freq_hash->{$_}, "+"x$self->sigma_hash->{$_}, "-"x($inter_sorted{$_} // 0) ))
-		for sort { $sort_list{$b} <=> $sort_list{$a} } keys %sort_list;
+	my $format = "%" . $self->max_word . "s|%s\n";
+	my @sort_list_keys = sort { $sort_list{$b} <=> $sort_list{$a} } keys %sort_list;
+	my $highest = $sort_list{$sort_list_keys[0]};
+	for ( @sort_list_keys ) {
+		my $score = 20*$sort_list{$_}/$highest;
+		printf $format => ( $_ , "-" x $score );
+	}
 	say "";
 
 	return $self;

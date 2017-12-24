@@ -2,19 +2,19 @@
 use ExtUtils::MakeMaker;
 WriteMakefile
 (
+  'INSTALLDIRS' => 'site',
+  'PREREQ_PM' => {
+                   'List::AllUtils' => 0,
+                   'Test::More' => 0,
+                   'Carp' => 0,
+                   'Moo' => '2.003002',
+                   'Data::Dumper' => 0,
+                   'Types::Standard' => 0,
+                   'Lingua::Sentence' => '1.100'
+                 },
+  'NAME' => 'Text::Summarizer',
   'EXE_FILES' => [],
   'VERSION_FROM' => 'lib/Text/Summarizer.pm',
-  'NAME' => 'Text::Summarizer',
-  'PREREQ_PM' => {
-                   'Lingua::Sentence' => '1.100',
-                   'Data::Dumper' => 0,
-                   'Test::More' => 0,
-                   'Types::Standard' => 0,
-                   'List::AllUtils' => 0,
-                   'Carp' => 0,
-                   'Moo' => '2.003002'
-                 },
-  'PL_FILES' => {},
-  'INSTALLDIRS' => 'site'
+  'PL_FILES' => {}
 )
 ;
