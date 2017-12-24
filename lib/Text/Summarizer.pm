@@ -462,7 +462,7 @@ sub pretty_printer {
 
 	say "PHRASES:";
 	for my $phrase (sort { $self->inter_hash->{$b} <=> $self->inter_hash->{$a} } keys %{$self->inter_hash}) {
-		say "\t$phrase => " . $self->inter_hash->{$phrase};
+		say "\t$phrase => " . ($self->inter_hash->{$phrase} + 1);
 	} 
 	say "\n";
 
