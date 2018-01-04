@@ -1,4 +1,5 @@
 #!/usr/bin/env perl
+use lib 'lib';
 use Text::Summarizer;
 
 my $summarizer = Text::Summarizer->new;

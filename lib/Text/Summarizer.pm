@@ -127,7 +127,7 @@ has inter_hash => (
 	isa => Ref['HASH'],
 );
 
-has max_word => (
+has max_word_length => (
 	is => 'rwp',
 	isa => Int,
 	default => 0,
@@ -154,7 +154,7 @@ sub load_watchlist {
 	close $watchlist_file;
 
 	$self->_set_watch_count( sum values %watch_list // 0 );  #counts the total number of watch_words ever collected
-	$self->_set_max_word( max keys %watch_list // 0 );  #generates the length of the longest word collected
+	$self->_set_max_word_length( max map { length } keys %watch_list // 0 );  #generates the length of the longest word collected
 	$self->_set_max_score( max map { length } values %watch_list // 0 );  #generates the length of the longest score collected
 
 	return \%watch_list;
@@ -213,7 +213,7 @@ sub summarize_file {
 	say "\nSummary of file $filepath";
 
 			my $t1 = Benchmark->new;
-	$self->split( $file );
+	$self->tokenize( $file );
 			my $t2 = Benchmark->new;
 			my $td1 = timediff($t2, $t1);
 			say "\t SPLIT: ",timestr($td1);
@@ -258,7 +258,7 @@ sub grow_watchlist {
 	}
 
 	$self->_set_watch_count( sum values %{$self->watchlist} // 0 );  #counts the total number of watch_words ever collected
-	$self->_set_max_word( max map { length } keys %{$self->watchlist} );  #generates the length of the longest word collected
+	$self->_set_max_word_length( max map { length } keys %{$self->watchlist} );  #generates the length of the longest word collected
 	$self->_set_max_score( max map { length } values %{$self->watchlist} );  #generates the length of the longest score collected
 
 	return $self;
@@ -272,7 +272,7 @@ sub store_watchlist {
 	open( my $watchlist_file, ">", $self->watchlist_path )
 		or die "Can't open $self->watchlist_path: $!";
 
-	my $string = "\%" . $self->max_word . "s | \%" . $self->max_score . "s\n";
+	my $string = "\%" . $self->max_word_length . "s | \%" . $self->max_score . "s\n";
 	printf $watchlist_file $string x @printlist, map { ($_ => $self->watchlist->{$_}) } @printlist;
 
 	close $watchlist_file;
@@ -324,7 +324,7 @@ sub store_stoplist {
 
 
 
-sub split {
+sub tokenize {
 	my ( $self, $file ) = @_;
 
 	my $full_text = lc join "\n" => map { $_ } <$file>;
@@ -417,21 +417,13 @@ sub analyze_phrases {
 			my $sentence = $self->sentences->[$f_vector->{sen}];
 			my @tokens   = split /[^A-Za-z0-9'’\-]+/ => $sentence;
 
-			my @phrases = grep { $self->stopwords->{$_} ? "[A-Za-z0-9'’\\-]+" : '$_' }
-					@tokens[  max( $position - $size => 0 ) .. min( $position + $size => scalar @tokens - 1 ) ];
+			my @phrases = @tokens[  max( $position - $size => 0 ) .. min( $position + $size => scalar @tokens - 1 ) ];
 
 			unshift @phrases => $sentence;
 			push @{$phrase_hash{$f_word}} => \@phrases;
 		}
 	}
 	$self->_set_phrase_hash( \%phrase_hash );
-
-
-		open( my $text_file, '<', "data/ts_stopwords.stop" )
-			or die "Can't open data/ts_stopwords.stop: $!";
-		my %stopwords = map { chomp; ($_ => 1) } <$text_file>;
-		close $text_file;
-
 
 	my $threshold = $self->phrase_min;
 	my $text = join ' ' => @{$self->word_list};
@@ -461,6 +453,7 @@ sub pretty_printer {
 	my $self = shift;
 
 	say "PHRASES:";
+
 	for my $phrase (sort { $self->inter_hash->{$b} <=> $self->inter_hash->{$a} } keys %{$self->inter_hash}) {
 		say "\t$phrase => " . ($self->inter_hash->{$phrase} + 1);
 	} 
@@ -474,10 +467,12 @@ sub pretty_printer {
 	}
 
 	say "WORDS:";
-	my $format = "%" . $self->max_word . "s|%s\n";
+
 	my @sort_list_keys = sort { $sort_list{$b} <=> $sort_list{$a} } keys %sort_list;
 	my $highest = $sort_list{$sort_list_keys[0]};
+	my $longest = max map {length} @sort_list_keys;
 	for ( @sort_list_keys ) {
+		my $format = "%" . ($longest + 2*scalar( (/’/) )) . "s|%s\n"; #weird middle bit addes whitespace to adjust (’) character spacing 
 		my $score = 20*$sort_list{$_}/$highest;
 		printf $format => ( $_ , "-" x $score );
 	}
