@@ -169,8 +169,8 @@ sub load_stopwords {
 	open( my $stopwords_file, '<', $self->stopwords_path )
 		or die "Can't open " . $self->stopwords_path . ": $!";
 
-	chomp xor $stop_words{ $_ } = 1 for (<$permanent_file>);
-	chomp xor $stop_words{ $_ } = 1 for (<$stopwords_file>);
+	chomp and $stop_words{ $_ } = 1 for (<$permanent_file>);
+	chomp and $stop_words{ $_ } = 1 for (<$stopwords_file>);
 
 	close $permanent_file;
 	close $stopwords_file;
@@ -327,11 +327,17 @@ sub store_stoplist {
 sub tokenize {
 	my ( $self, $file ) = @_;
 
-	my $full_text = lc join "\n" => map { $_ } <$file>;
+	my $full_text = join "\n" => map { $_ } <$file>;
 		#contains the full body of text
-	my @sentences = split /(?| (?:(?<!\ )(?<= \.|\!|\?) \s+\n?) | \s{3,} | \s*\n\s* | (?: (?<![A-Za-z0-9-]) > \s+)+ | (?: ^\s+$ ) | (?: ^$) )/mx, $full_text;
-		#create array of sentences
-	my @word_list = split /[^A-Za-z0-9'’\-]+/, $full_text;
+	my @sentences = split qr/(?|   (?<=(?<!\s[djms]r) (?<!\s[djms]rs) \.  |  \!  |  \?)  \s+\n?
+							   |   \s{3,}
+							   |   \s*\n\s*
+							   |   (?: (?<![A-Za-z0-9-]) > \s+)+
+							   |   (?: ^\s+$ )
+							   |   (?: ^$)
+							 )/mix => $full_text;
+		#create array of sentence
+	my @word_list = split /[^\w’'\-]+/ => ($full_text =~ s{“|”}{"}gur =~ s{‘|’}{'}gur);
 		#create array of every word in order
 
 	$self->_set_full_text( $full_text  );
@@ -351,8 +357,8 @@ sub analyze_frequency {
 	my %frequency;
 	for (@{$self->word_list}) {
 		if ($_ !~ /\A \W+ \Z/x) {
-			s/ [^A-Za-z0-9]+ s? \Z //gx;
-			$frequency{$_}++ if length $_ >= $min_length and not $self->stopwords->{$_};
+			s/ [^[:alpha:]]+ s? \Z //gx;
+			$frequency{$_}++ if length $_ >= $min_length and not $self->stopwords->{lc $_};
 		}
 	}
 	my $min_freq_threshold = int($wordcount*40/10000) or 1;
@@ -372,12 +378,12 @@ sub analyze_clusters {
 	my $cluster_count;
 	my %cluster_hash;
 	for my $sentence (0..scalar @{$self->sentences} - 1) {
-		my @sen_words = split /[^A-Za-z0-9'’\-]+/, $self->sentences->[$sentence];
+		my @sen_words = split /[^[:alpha:]’'-]+/, $self->sentences->[$sentence];
 
 		for my $f_word (keys %{$self->freq_hash}) {
 			for my $position (0..scalar @sen_words - 1) {
 				$cluster_count++;
-				if ( $sen_words[$position] =~ /\A$f_word\Z/) {
+				if ( $sen_words[$position] =~ /\A$f_word\Z/i) {
 					my %word;
 					@word{ qw/ sen pos all / } = ( $sentence, $position, $cluster_count );
 					push @{$cluster_hash{$f_word}} => \%word;
@@ -415,7 +421,7 @@ sub analyze_phrases {
 		for my $f_vector (@{$self->cluster_hash->{$f_word}}) {
 			my $position = $f_vector->{pos};
 			my $sentence = $self->sentences->[$f_vector->{sen}];
-			my @tokens   = split /[^A-Za-z0-9'’\-]+/ => $sentence;
+			my @tokens   = split /[^[:alpha:]’'-]+/ => $sentence;
 
 			my @phrases = @tokens[  max( $position - $size => 0 ) .. min( $position + $size => scalar @tokens - 1 ) ];
 
@@ -426,18 +432,18 @@ sub analyze_phrases {
 	$self->_set_phrase_hash( \%phrase_hash );
 
 	my $threshold = $self->phrase_min;
-	my $text = join ' ' => @{$self->word_list};
+	my $text = lc join ' ' => @{$self->word_list};
 	my %inter_hash;
 	my %phrase_list;
 	KEYWORD: for my $f_word (keys %{$self->phrase_hash}) {
 		PHRASE: for my $phrase ( @{$self->phrase_hash->{$f_word}} ) {
-			my @words = split /[^A-Za-z0-9-']+/ => shift @$phrase;
+			my @words = split /[^[:alpha:]’'-]+/ => shift @$phrase;
 
 			my $sentence = join ' ' => @words;
 			next PHRASE unless scalar @$phrase >= $self->phrase_small;
 
 			$phrase = join ' ' => @$phrase;
-			$inter_hash{$phrase}++ and $phrase_list{$sentence}++ for ( $text =~ /$phrase/g );
+			++$inter_hash{$phrase} and ++$phrase_list{$sentence} for ( $text =~ m/$phrase/ig );
 		}
 	}
 	delete $inter_hash{$_} for grep { $inter_hash{$_} < $threshold } keys %inter_hash;
