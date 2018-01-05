@@ -102,6 +102,11 @@ has word_list => (
 	isa => Ref['ARRAY'],
 );
 
+has sen_words => (
+	is => 'rwp',
+	isa => Ref['ARRAY'],
+);
+
 has freq_hash => (
 	is => 'rwp',
 	isa => Ref['HASH'],
@@ -356,10 +361,15 @@ sub tokenize {
 							   |   (?: ^\s+$ )
 							   |   (?: ^$)
 							 )/mix => $full_text;
-		#create array of sentence
-	my @word_list = grep { not $self->stopwords->{$_} and length $_ >= $self->word_length_threshold }
-					 split /\W+/ => lc $full_text;
-		#creates an array of each word in the current article that is not a stopword and is longer than the given *word_length_threshold*
+		# array of sentences
+
+	my @word_list;  # array literal of all the words in the entire text body
+	my @sen_words; # array reference to all of the tokens in each sentence
+	for (@sentences) {  #creates an array of each word in the current article that is not a stopword and is longer than the given *word_length_threshold*
+		my @temp = grep { not $self->stopwords->{$_} and length $_ >= $self->word_length_threshold } split /\W+/ => lc $_;
+		push @word_list => @temp;
+		push @sen_words => \@temp;
+	}
 
 	$self->_set_article_length( scalar @word_list ); 
 		#counts the total number of words in the article
@@ -367,6 +377,7 @@ sub tokenize {
 	$self->_set_full_text( $full_text  );
 	$self->_set_sentences( \@sentences );
 	$self->_set_word_list( \@word_list );
+	$self->_set_sen_words( \@sen_words );
 
 
 	return $self;
@@ -379,30 +390,28 @@ sub analyze_phrases {
 
 
 
-	my $min_freq_threshold = int($self->article_length * $self->freq_constant) or 1; #estimates a minimum threshold of occurence for frequently occuring words
+	my $min_freq_thresh = int($self->article_length * $self->freq_constant) // 1; #estimates a minimum threshold of occurence for frequently occuring words
 
 	my %frequency; #counts the number of times each word appears in the *%word_list* hash
 	$frequency{$_}++ for @{$self->word_list};
-	grep { delete $frequency{$_} if $frequency{$_} < $min_freq_threshold } keys %frequency;
-		#remove words that appear less than the $min_freq_threshold (defaults to 1)
+	grep { delete $frequency{$_} if $frequency{$_} < $min_freq_thresh } keys %frequency;
+		#remove words that appear less than the *$min_freq_thresh* (defaults to 1)
 
 	$self->_set_freq_hash( \%frequency );
 
 
 
-	my %cluster_hash;
-
-	my %cluster_count;
-	for my $sentence_num (0..scalar @{$self->sentences} - 1) { #gives the index of each sentence in the article
-		my @sen_words = grep { not $self->stopwords->{$_} and length $_ >= $self->word_length_threshold }
-						 split /\W+/, $self->sentences->[$sentence_num]; 
+	my (%cluster_hash, %cluster_count);
+	for my $sen_index (0..scalar @{$self->sentences} - 1) { #gives the index of each sentence in the article
+		my @sen_words = @{$self->sen_words->[$sen_index]}; 
 						# creates an array of each word in the given sentence,
 						# given that the word is not a stopword and is longer than the given *word_length_threshold*
+		
 
 		for my $position (0..scalar @sen_words - 1) { #iterates across each word in the sentence
 			if ( exists $self->freq_hash->{$sen_words[$position]}) { ## true if the given word at index *position* appears in the *freq_hash*
-				my %word = ( sen => $sentence_num, pos => $position, cnt => ++$cluster_count{$sen_words[$position]} );
-					# hash of three keys:
+				my %word = ( sen => $sen_index, pos => $position, cnt => ++$cluster_count{$sen_words[$position]} );
+					# hash-vector of three elements:
 					#	sen => the index of the current sentence
 					#	pos => index of the current word within the current sentence
 					#	cnt => number of times the given word has appeared in the entire text file
@@ -414,15 +423,8 @@ sub analyze_phrases {
 
 
 
-	#create long-form phrases around frequently used words by tracking forward and back *phrase_radius* from any given *c_word*
-	my $radius = $self->phrase_radius;
-
-	my $squaresum;
-	my $sum;
-	my %sigma_hash;
-	my $cluster_count;
-
-	my %phrase_hash; #collects each long-form phrase
+	#create long-form phrases around frequently used words by tracking forward and backward *phrase_radius* from any given *c_word*
+	my ($squaresum, $sum, %sigma_hash, %phrase_hash);
 	for my $c_word (keys %{$self->cluster_hash}) {
 		for my $c_vector (@{$self->cluster_hash->{$c_word}}) {
 			$squaresum += $c_vector->{cnt}**2;
@@ -431,23 +433,23 @@ sub analyze_phrases {
 			my $position = $c_vector->{pos};
 			my $clusters = $c_vector->{cnt};
 
-			$cluster_count += $clusters;
-
 			my $sentence = $self->sentences->[$sen_index];
-			my @tokens   = split /\W+/ => $sentence;
+			my @tokens   = @{$self->sen_words->[$sen_index]};
 
-			my @phrases = @tokens[  max( $position - $radius => 0 ) .. min( $position + $radius => scalar @tokens - 1 ) ];
+			my @phrases = @tokens[  max( $position - $self->phrase_radius, 0 ) .. min( $position + $self->phrase_radius, scalar(@tokens) - 1 ) ];
 
 			unshift @phrases => $sentence;
 			push @{$phrase_hash{$c_word}} => \@phrases;
 		}
 
+		my $cluster_count = $self->cluster_hash->{$c_word}->[-1]->{cnt};
 		my $sigma = sqrt( ($squaresum - $squaresum / $cluster_count) / $cluster_count );	#pop. std. deviation
-		$sigma_hash{$c_word} = int( $sigma / 20 );
+		$sigma_hash{$c_word} = int( $sigma );
 		$sigma_hash{$_} = $sigma_hash{$_} // 0 for keys %{$self->freq_hash};
 	}
 	$self->_set_sigma_hash( \%sigma_hash );
 	$self->_set_phrase_hash( \%phrase_hash );
+
 
 
 	#find common phrase-fragments
@@ -498,9 +500,9 @@ sub pretty_printer {
 	my $highest = $sort_list{$sort_list_keys[0]};
 	my $longest = max map {length} @sort_list_keys;
 	for ( @sort_list_keys ) {
-		my $format = "%" . ($longest + 2*scalar( (/’/) )) . "s|%s\n"; #weird middle bit addes whitespace to adjust (’) character spacing 
-		my $score = 20*$sort_list{$_}/$highest;
-		printf $format => ( $_ , "-" x $score );
+		my $format = "%" . $longest . "s|%s\n";
+		my $score = int(40*$sort_list{$_}/$highest);
+		printf $format => ( $_ , "-" x $score ) if $score > sum(values %sort_list) / scalar keys %sort_list;
 	}
 	say "";
 
