@@ -199,6 +199,7 @@ sub load_stopwords {
 
 
 
+#scanning is used to augment the *watchlist* and *stopwords* attributes
 sub scan_file {
 	my ($self, $filepath) = @_;
 
@@ -223,6 +224,9 @@ sub scan_all {
 	return $self;
 }
 
+
+
+#summarizing is used to extract common phrase fragments from a given text file.
 sub summarize_file {
 	my ($self, $filepath) = @_;
 
@@ -231,23 +235,20 @@ sub summarize_file {
 
 	say "\nSummary of file $filepath";
 
+	$self->watchlist;
+	$self->stopwords;
+
 			my $t1 = Benchmark->new;
-	$self->tokenize( $file );
+
+	$self->tokenize( $file );	#breaks the provided file into sentences and individual words
 			my $t2 = Benchmark->new;
 			my $td1 = timediff($t2, $t1);
 			say "\t SPLIT: ",timestr($td1);
-	$self->analyze_frequency;
+
+	$self->analyze_phrases;		#
 			my $t3 = Benchmark->new;
 			my $td2 = timediff($t3, $t2);
-			say "\t  FREQ: ",timestr($td2);
-	$self->analyze_clusters;
-			my $t4 = Benchmark->new;
-			my $td3 = timediff($t4, $t3);
-			say "\t CLUST: ",timestr($td3);
-	$self->analyze_phrases;
-			my $t5 = Benchmark->new;
-			my $td4 = timediff($t5, $t4);
-			say "\tPHRASE: ",timestr($td4);
+			say "\tPHRASE: ",timestr($td2);
 
 	$self->pretty_printer;
 
@@ -356,78 +357,17 @@ sub tokenize {
 							   |   (?: ^$)
 							 )/mix => $full_text;
 		#create array of sentence
-	my @word_list = split /[^\w’'\-]+/ => ($full_text =~ s{“|”}{"}gur =~ s{‘|’}{'}gur);
-		#create array of every word in order
+	my @word_list = grep { not $self->stopwords->{$_} and length $_ >= $self->word_length_threshold }
+					 split /\W+/ => lc $full_text;
+		#creates an array of each word in the current article that is not a stopword and is longer than the given *word_length_threshold*
+
+	$self->_set_article_length( scalar @word_list ); 
+		#counts the total number of words in the article
 
 	$self->_set_full_text( $full_text  );
 	$self->_set_sentences( \@sentences );
 	$self->_set_word_list( \@word_list );
 
-	return $self;
-}
-
-
-
-# creates a hash-listing of the number of times each word appears in the given article
-sub analyze_frequency {
-	my $self = shift;
-
-	my $wordcount = scalar @{$self->word_list};  #counts the total words in the article
-	my $min_length = 3;
-	my %frequency;
-	for (@{$self->word_list}) {
-		if ($_ !~ /\A \W+ \Z/x) {
-			s/ [^[:alpha:]]+ s? \Z //gx;
-			$frequency{$_}++ if length $_ >= $min_length and not $self->stopwords->{lc $_};
-		}
-	}
-	my $min_freq_threshold = int($wordcount*40/10000) or 1;
-	grep { delete $frequency{$_} if $frequency{$_} < $min_freq_threshold } keys %frequency;
-		#remove words that appear less than the $min_freq_threshold (defaults to 1)
-
-	$self->_set_freq_hash( \%frequency );
-
-	return $self;
-}
-
-
-
-# creates a hash-list of the vector pointing to each occurence of a every word
-# 
-sub analyze_clusters {
-	my $self = shift;
-
-	my $cluster_count;
-	my %cluster_hash;
-	for my $sentence (0..scalar @{$self->sentences} - 1) {
-		my @sen_words = split /[^[:alpha:]’'-]+/, $self->sentences->[$sentence];
-
-		for my $f_word (keys %{$self->freq_hash}) {
-			for my $position (0..scalar @sen_words - 1) {
-				$cluster_count++;
-				if ( $sen_words[$position] =~ /\A$f_word\Z/i) {
-					my %word;
-					@word{ qw/ sen pos all / } = ( $sentence, $position, $cluster_count );
-					push @{$cluster_hash{$f_word}} => \%word;
-				}
-			}
-		}
-	}
-	$self->_set_cluster_hash( \%cluster_hash );
-
-	my $squaresum;
-	my $sum;
-	my %sigma_hash;
-	for my $f_word (keys %{$self->cluster_hash}) {
-		for my $f_vector (@{$self->cluster_hash->{$f_word}}) {
-			$squaresum += $f_vector->{all}**2;
-			$sum += $f_vector->{all};
-		}
-		my $sigma = sqrt( ($squaresum - $sum**2 / $cluster_count) / $cluster_count );	#pop. std. deviation
-		$sigma_hash{$f_word} = int( $sigma / 20 );
-		$sigma_hash{$_} = $sigma_hash{$_} // 0 for keys %{$self->freq_hash};
-	}
-	$self->_set_sigma_hash( \%sigma_hash );
 
 	return $self;
 }
@@ -437,38 +377,96 @@ sub analyze_clusters {
 sub analyze_phrases {
 	my $self = shift;
 
-	my $size = $self->phrase_size;
-	my %phrase_hash;
-	for my $f_word (keys %{$self->cluster_hash}) {
-		for my $f_vector (@{$self->cluster_hash->{$f_word}}) {
-			my $position = $f_vector->{pos};
-			my $sentence = $self->sentences->[$f_vector->{sen}];
-			my @tokens   = split /[^[:alpha:]’'-]+/ => $sentence;
 
-			my @phrases = @tokens[  max( $position - $size => 0 ) .. min( $position + $size => scalar @tokens - 1 ) ];
 
-			unshift @phrases => $sentence;
-			push @{$phrase_hash{$f_word}} => \@phrases;
+	my $min_freq_threshold = int($self->article_length * $self->freq_constant) or 1; #estimates a minimum threshold of occurence for frequently occuring words
+
+	my %frequency; #counts the number of times each word appears in the *%word_list* hash
+	$frequency{$_}++ for @{$self->word_list};
+	grep { delete $frequency{$_} if $frequency{$_} < $min_freq_threshold } keys %frequency;
+		#remove words that appear less than the $min_freq_threshold (defaults to 1)
+
+	$self->_set_freq_hash( \%frequency );
+
+
+
+	my %cluster_hash;
+
+	my %cluster_count;
+	for my $sentence_num (0..scalar @{$self->sentences} - 1) { #gives the index of each sentence in the article
+		my @sen_words = grep { not $self->stopwords->{$_} and length $_ >= $self->word_length_threshold }
+						 split /\W+/, $self->sentences->[$sentence_num]; 
+						# creates an array of each word in the given sentence,
+						# given that the word is not a stopword and is longer than the given *word_length_threshold*
+
+		for my $position (0..scalar @sen_words - 1) { #iterates across each word in the sentence
+			if ( exists $self->freq_hash->{$sen_words[$position]}) { ## true if the given word at index *position* appears in the *freq_hash*
+				my %word = ( sen => $sentence_num, pos => $position, cnt => ++$cluster_count{$sen_words[$position]} );
+					# hash of three keys:
+					#	sen => the index of the current sentence
+					#	pos => index of the current word within the current sentence
+					#	cnt => number of times the given word has appeared in the entire text file
+				push @{$cluster_hash{$sen_words[$position]}} => \%word;
+			}
 		}
 	}
+	$self->_set_cluster_hash( \%cluster_hash );
+
+
+
+	#create long-form phrases around frequently used words by tracking forward and back *phrase_radius* from any given *c_word*
+	my $radius = $self->phrase_radius;
+
+	my $squaresum;
+	my $sum;
+	my %sigma_hash;
+	my $cluster_count;
+
+	my %phrase_hash; #collects each long-form phrase
+	for my $c_word (keys %{$self->cluster_hash}) {
+		for my $c_vector (@{$self->cluster_hash->{$c_word}}) {
+			$squaresum += $c_vector->{cnt}**2;
+
+			my $sen_index = $c_vector->{sen};
+			my $position = $c_vector->{pos};
+			my $clusters = $c_vector->{cnt};
+
+			$cluster_count += $clusters;
+
+			my $sentence = $self->sentences->[$sen_index];
+			my @tokens   = split /\W+/ => $sentence;
+
+			my @phrases = @tokens[  max( $position - $radius => 0 ) .. min( $position + $radius => scalar @tokens - 1 ) ];
+
+			unshift @phrases => $sentence;
+			push @{$phrase_hash{$c_word}} => \@phrases;
+		}
+
+		my $sigma = sqrt( ($squaresum - $squaresum / $cluster_count) / $cluster_count );	#pop. std. deviation
+		$sigma_hash{$c_word} = int( $sigma / 20 );
+		$sigma_hash{$_} = $sigma_hash{$_} // 0 for keys %{$self->freq_hash};
+	}
+	$self->_set_sigma_hash( \%sigma_hash );
 	$self->_set_phrase_hash( \%phrase_hash );
 
-	my $threshold = $self->phrase_min;
+
+	#find common phrase-fragments
+	my $count_threshold = $self->phrase_min;
 	my $text = lc join ' ' => @{$self->word_list};
 	my %inter_hash;
 	my %phrase_list;
 	KEYWORD: for my $f_word (keys %{$self->phrase_hash}) {
 		PHRASE: for my $phrase ( @{$self->phrase_hash->{$f_word}} ) {
-			my @words = split /[^[:alpha:]’'-]+/ => shift @$phrase;
+			my @words = split /\W+/ => shift @$phrase;
 
 			my $sentence = join ' ' => @words;
-			next PHRASE unless scalar @$phrase >= $self->phrase_small;
+			next PHRASE unless scalar @$phrase >= $self->phrase_threshold;
 
 			$phrase = join ' ' => @$phrase;
 			++$inter_hash{$phrase} and ++$phrase_list{$sentence} for ( $text =~ m/$phrase/ig );
 		}
 	}
-	delete $inter_hash{$_} for grep { $inter_hash{$_} < $threshold } keys %inter_hash;
+	delete $inter_hash{$_} for grep { $inter_hash{$_} < $count_threshold } keys %inter_hash;
 	$self->_set_inter_hash( \%inter_hash );
 	$self->_set_phrase_list( \%phrase_list );
 
