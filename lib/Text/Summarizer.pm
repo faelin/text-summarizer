@@ -7,7 +7,7 @@ use strict;
 use warnings;
 use Lingua::Sentence;
 use Moo;
-use Types::Standard qw/ Ref Str Int InstanceOf /;
+use Types::Standard qw/ Ref Str Int Num InstanceOf /;
 use List::AllUtils qw/ max min sum /;
 use Data::Dumper;
 
@@ -55,13 +55,13 @@ has phrase_list => (
 	isa => Ref['HASH'],
 );
 
-has phrase_size => (
+has phrase_radius => (
 	is => 'rwp',
 	isa => Int,
 	default => 5,
 );
 
-has phrase_small => (
+has phrase_threshold => (
 	is => 'rwp',
 	isa => Int,
 	default => 3,
@@ -133,10 +133,29 @@ has max_word_length => (
 	default => 0,
 );
 
+has word_length_threshold => (
+	is => 'rwp',
+	isa => Int,
+	default => 3,
+);
+
+has article_length => (
+	is => 'rwp',
+	isa => Int,
+	default => 0,
+	lazy => 1,
+);
+
 has max_score => (
 	is => 'rwp',
 	isa => Int,
 	default => 0,
+);
+
+has freq_constant => (
+	is => 'rwp',
+	isa => Num,
+	default => 0.004,
 );
 
 
@@ -349,6 +368,7 @@ sub tokenize {
 
 
 
+# creates a hash-listing of the number of times each word appears in the given article
 sub analyze_frequency {
 	my $self = shift;
 
@@ -372,6 +392,8 @@ sub analyze_frequency {
 
 
 
+# creates a hash-list of the vector pointing to each occurence of a every word
+# 
 sub analyze_clusters {
 	my $self = shift;
 
