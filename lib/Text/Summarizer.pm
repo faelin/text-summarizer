@@ -452,13 +452,6 @@ sub analyze_phrases {
 
 
 
-	##
-	##
-	## WORKS UP TO HERE!
-	##
-	##
-
-
 	#find common phrase-fragments
 	my $count_threshold = $self->phrase_min;
 	my %inter_hash;
@@ -467,21 +460,28 @@ sub analyze_phrases {
 		my @phrase_list  = @{$self->phrase_hash->{$f_word}};
 		my $phrase_index = 0;
 
-		while ( $phrase_index < scalar @phrase_list - 2 ) {  # prevents out-of-bounds error
+		for my $phrase_index ( 0..scalar @phrase_list - 2 ) {  # prevents out-of-bounds error
 			my @phrase;
-			OUTER: for my $word_index ( 1..scalar @{$phrase_list[$phrase_index]} - 1) {
-				INNER: for my $sec_index ( 1..scalar @{$phrase_list[$phrase_index + 1]} - 1 ) {
-					if ( $phrase_list[$phrase_index]->[$word_index] eq $phrase_list[$phrase_index]->[$sec_index] ) {
+			my ($out_start, $inn_start) = (1,1);
+
+			OUTER: for my $word_index ( $out_start..scalar @{$phrase_list[$phrase_index]} - 1) {
+				INNER: for my $sec_index ( $inn_start..scalar @{$phrase_list[$phrase_index + 1]} - 1 ) {
+					if ( $phrase_list[$phrase_index]->[$word_index] eq $phrase_list[$phrase_index + 1]->[$sec_index] ) {
 						push @phrase => $phrase_list[$phrase_index]->[$word_index];
+						$inn_start++;
 					} else {
-						grep { $inter_hash{$_}++ and $full_phrases{$phrase_list[$phrase_index]->[0]}++ } join @phrase if scalar @phrase > $self->phrase_threshold;
-						next INNER;
+						if (scalar @phrase > $self->phrase_threshold) {
+							my $string = join ' ' => @phrase;
+							$inter_hash{$string}++ and $full_phrases{$phrase_list[$phrase_index]->[0]}++ and $full_phrases{$phrase_list[$phrase_index + 1]->[0]}++;
+						}
 					}
+
+					next OUTER;
 				}
 			}
 		}
 	}
-	# delete $inter_hash{$_} for grep { $inter_hash{$_} < $count_threshold } keys %inter_hash;
+	delete $inter_hash{$_} for grep { $inter_hash{$_} < $count_threshold } keys %inter_hash;
 	$self->_set_inter_hash( \%inter_hash );
 	$self->_set_phrase_list( \%full_phrases );
 
