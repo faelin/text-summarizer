@@ -132,6 +132,11 @@ has inter_hash => (
 	isa => Ref['HASH'],
 );
 
+has score_hash => (
+	is => 'rwp',
+	isa => Ref['HASH'],
+);
+
 has max_word_length => (
 	is => 'rwp',
 	isa => Int,
@@ -366,7 +371,7 @@ sub tokenize {
 	my @word_list;  # array literal of all the words in the entire text body
 	my @sen_words; # array reference to all of the tokens in each sentence
 	for (@sentences) {  #creates an array of each word in the current article that is not a stopword and is longer than the given *word_length_threshold*
-		my @temp = grep { not $self->stopwords->{$_} and length $_ >= $self->word_length_threshold } split /\W+/ => lc $_;
+		my @temp = split /\W+/ => lc $_;
 		push @word_list => @temp;
 		push @sen_words => \@temp;
 	}
@@ -427,61 +432,62 @@ sub analyze_phrases {
 	my ($squaresum, $sum, %sigma_hash, %phrase_hash);
 	for my $c_word (keys %{$self->cluster_hash}) {
 		for my $c_vector (@{$self->cluster_hash->{$c_word}}) {
-			$squaresum += $c_vector->{cnt}**2;
 
-			my $sen_index = $c_vector->{sen};
+			my $sen_indx = $c_vector->{sen};
 			my $position = $c_vector->{pos};
-			my $clusters = $c_vector->{cnt};
+			my $clst_cnt = $c_vector->{cnt};
+			my $sentence = $self->sentences->[$sen_indx];
 
-			my $sentence = $self->sentences->[$sen_index];
-			my @tokens   = @{$self->sen_words->[$sen_index]};
+			$squaresum += $clst_cnt**2;
+			my @tokens   = @{$self->sen_words->[$sen_indx]};
 
 			my @phrases = @tokens[  max( $position - $self->phrase_radius, 0 ) .. min( $position + $self->phrase_radius, scalar(@tokens) - 1 ) ];
 
 			unshift @phrases => $sentence;
-			push @{$phrase_hash{$c_word}} => \@phrases;
+			push @{$phrase_hash{$c_word}} => \@phrases if scalar @phrases > $self->phrase_threshold;
 		}
 
 		my $cluster_count = $self->cluster_hash->{$c_word}->[-1]->{cnt};
-		my $sigma = sqrt( ($squaresum - $squaresum / $cluster_count) / $cluster_count );	#pop. std. deviation
+		my $sigma = sqrt( ($squaresum - ($squaresum / $cluster_count)) / $cluster_count );	#pop. std. deviation
 		$sigma_hash{$c_word} = int( $sigma );
-		$sigma_hash{$_} = $sigma_hash{$_} // 0 for keys %{$self->freq_hash};
 	}
+	$sigma_hash{$_} = $sigma_hash{$_} // 0 for keys %{$self->freq_hash};
+
 	$self->_set_sigma_hash( \%sigma_hash );
 	$self->_set_phrase_hash( \%phrase_hash );
 
 
 
 	#find common phrase-fragments
-	my $count_threshold = $self->phrase_min;
-	my %inter_hash;
-	my %full_phrases;
+	my (%inter_hash, %score_hash, %full_phrases);
 	F_WORD: for my $f_word (keys %{$self->phrase_hash}) {
 		my @phrase_list  = @{$self->phrase_hash->{$f_word}};
-		my $phrase_index = 0;
 
 		for my $phrase_index ( 0..scalar @phrase_list - 2 ) {  # prevents out-of-bounds error
 			my @phrase;
-			my ($out_start, $inn_start) = (1,1);
+			
+			my $start = 1;
+			L_WORD: for my $L_index ( 1..scalar @{$phrase_list[$phrase_index]} - 1) {
+				R_WORD: for my $R_index ( $start..scalar @{$phrase_list[$phrase_index + 1]} - 1 ) {
+					if ( $phrase_list[$phrase_index]->[$L_index] eq $phrase_list[$phrase_index + 1]->[$R_index] ) {
+						push @phrase => $phrase_list[$phrase_index]->[$L_index];
+						$start++;
+					} elsif (scalar @phrase > $self->phrase_threshold) {
+						my $string = join ' ' => @phrase;
+						$score_hash{$f_word}++;
+						$inter_hash{$string}++;
+						$full_phrases{$phrase_list[$phrase_index]->[0]}++;
+						$full_phrases{$phrase_list[$phrase_index + 1]->[0]}++;
 
-			OUTER: for my $word_index ( $out_start..scalar @{$phrase_list[$phrase_index]} - 1) {
-				INNER: for my $sec_index ( $inn_start..scalar @{$phrase_list[$phrase_index + 1]} - 1 ) {
-					if ( $phrase_list[$phrase_index]->[$word_index] eq $phrase_list[$phrase_index + 1]->[$sec_index] ) {
-						push @phrase => $phrase_list[$phrase_index]->[$word_index];
-						$inn_start++;
-					} else {
-						if (scalar @phrase > $self->phrase_threshold) {
-							my $string = join ' ' => @phrase;
-							$inter_hash{$string}++ and $full_phrases{$phrase_list[$phrase_index]->[0]}++ and $full_phrases{$phrase_list[$phrase_index + 1]->[0]}++;
-						}
+						$start = 1;
 					}
 
-					next OUTER;
+					next L_WORD;
 				}
 			}
 		}
 	}
-	delete $inter_hash{$_} for grep { $inter_hash{$_} < $count_threshold } keys %inter_hash;
+	$self->_set_score_hash( \%score_hash );
 	$self->_set_inter_hash( \%inter_hash );
 	$self->_set_phrase_list( \%full_phrases );
 
@@ -504,18 +510,20 @@ sub pretty_printer {
 	for (keys %{$self->freq_hash}) {
 		$sort_list{$_} += $self->freq_hash->{$_}  // 0;
 		$sort_list{$_} += $self->sigma_hash->{$_} // 0;
-		$sort_list{$_} += $self->inter_hash->{$_} // 0;
+		$sort_list{$_} += $self->score_hash->{$_} // 0;
 	}
 
 	say "WORDS:";
 
 	my @sort_list_keys = sort { $sort_list{$b} <=> $sort_list{$a} } keys %sort_list;
 	my $highest = $sort_list{$sort_list_keys[0]};
+	my $average = sum(values %sort_list) / scalar @sort_list_keys;
 	my $longest = max map {length} @sort_list_keys;
-	for ( @sort_list_keys ) {
+	KEY: for ( @sort_list_keys ) {
+		next KEY if $self->stopwords->{$_};
 		my $format = "%" . $longest . "s|%s\n";
 		my $score = int(40*$sort_list{$_}/$highest);
-		printf $format => ( $_ , "-" x $score ) if $score > sum(values %sort_list) / scalar keys %sort_list;
+		printf $format => ( $_ , "-" x $score ) if $score > 2;
 	}
 	say "";
 
