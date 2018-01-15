@@ -476,75 +476,65 @@ sub analyze_phrases {
 	#find common phrase-fragments
 	my (%inter_hash, %score_hash, %full_phrases); #*inter_hash* contains phrase fragments;  *score_hash* contains score values for words in those phrases
 	F_WORD: for my $f_word (keys %{$self->phrase_hash}) {
-		my @phrase_list = @{$self->phrase_hash->{$f_word}}; #list of all phrase fragments that contain the given *f_word*
-
 		my (@hash_list, %sum_list); #*hash_list* contains ordered, formatted lists of each word in the phrase fragment;  *sum_list* contains the total number of times each word appears in all phrases for the given *f_word*
-		for my $phrase (@phrase_list) {
-			my %words = map { $sum_list{$phrase->[$_]}++; ((sprintf "%02d" => $_), $phrase->[$_]) } (1..scalar @{$phrase} - 1);
+		for my $phrase (@{$self->phrase_hash->{$f_word}}) {
+			my %ordered_words = map { $sum_list{$phrase->[$_]}++; ((sprintf "%02d" => $_), $phrase->[$_]) } (1..scalar @{$phrase} - 1);
 				# *words* contains an ordered, formatted list of each word in the given phrase fragment, looks like:
 				# 	'01' => 'some'
 				#	'02' => 'word'
 				#	'03' => 'goes'
 				# 	'04' => 'here'
-			my %full_phrase = %words;
-			push @hash_list => [$f_word, \%full_phrase, \%words];
+			my %full_phrase = %ordered_words;
+			push @hash_list => [$f_word, \%full_phrase, \%ordered_words];
 		}
 
+		#removes each word from the *word_hash* unless it occurs more than once amongst all phrases
 		for my $word_hash (@hash_list) {
-			grep { delete $word_hash->[-1]->{$_} if $sum_list{$word_hash->[-1]->{$_}} < 2 } keys %{$word_hash->[-1]};
-				#removes each word from the *word_hash* unless it occurs more than once amongst all phrases
+			grep { delete $word_hash->[-1]->{$_} unless $sum_list{$word_hash->[-1]->{$_}} > 1 } keys %{$word_hash->[-1]};
 		}
 
-
-		my @frag_list = ();
+		#break phrases fragments into "scraps" (consecutive runs of words within the fragment)
+		my @frag_list;
 		FRAGMENT: for my $word_hash (@hash_list) {
-			my (%L_scrap, %R_scrap); #"scrap" is a sub-fragment
-			my ($prev, $curr, $next) = (-1,0,0); #used to find consecutive sequences
-			my @words_key = sort keys %{$word_hash->[-1]}; #composed of a series index-values
+			my (%L_scrap, %R_scrap); #a "scrap" is a sub-fragment
+			my ($prev, $curr, $next) = (-1,0,0); #used to find consecutive sequences of words
 			my $real = 0; #flag for stopwords identification
 
-			for (my $i = 0; $i < scalar @words_key; $i++ ) {
-				$curr = $words_key[$i];
-				$next = $words_key[$i+1] if $i < scalar @words_key - 1;
+			my @word_keys = sort keys %{$word_hash->[-1]}; # *word_keys* contains a series of index-values
+			for (my $i = 0; $i < scalar @word_keys; $i++ ) {
+				$curr = $word_keys[$i];
+				$next = $word_keys[$i+1] if $i < scalar @word_keys - 1; # if-statement prevents out-of-bounds error
 
 				if ( $next == $curr + 1 or $curr == $prev + 1 ) {
-					unless ($curr == $prev + 1) {
-						%L_scrap = %R_scrap if scalar keys %L_scrap <= scalar keys %R_scrap;
-						%R_scrap = ();
+					unless ($curr == $prev + 1) {  #resets *R_scrap* when the *curr* index skips over a number (i.e. a new scrap is encountered)
+						%L_scrap = %R_scrap if keys %L_scrap <= keys %R_scrap; #chooses the longest or most recent scrap
+						%R_scrap = (); #resets the *R_scrap*
 					}
-					my $index = sprintf "%02d" => $curr;
-					$R_scrap{$index} = $word_hash->[-1]->{$index};
-					$real = 1 unless $self->stopwords->{$R_scrap{$index}}; #ensures that scraps consisting only of stopwords are ignored
+					$R_scrap{$curr} = $word_hash->[-1]->{$curr};
+					$real = 1 unless $self->stopwords->{$R_scrap{$curr}}; #ensures that scraps consisting only of stopwords are ignored
 				} else {
-					%L_scrap = %R_scrap if scalar keys %L_scrap <= scalar keys %R_scrap;
-					%R_scrap = ();
+					%L_scrap = %R_scrap if keys %L_scrap <= keys %R_scrap; #chooses the longest or most recent scrap
+					%R_scrap = (); #resets the *R_scrap*
 				}
 				$prev = $curr;
 			}
-			%L_scrap = %R_scrap if scalar keys %L_scrap <= scalar keys %R_scrap;
-			%R_scrap = ();
+			%L_scrap = %R_scrap if keys %L_scrap <= keys %R_scrap; #chooses the longest or most recent scrap
+			%R_scrap = (); #resets the *R_scrap*
 			push @frag_list => [$word_hash->[0], $word_hash->[1], $word_hash->[2], \%L_scrap] if $real and scalar keys %L_scrap >= $self->phrase_threshold;
 		}
 
-		# grep { print Dumper $_ } @frag_list if scalar @frag_list;
-		# say "\n";
-
+		#compile scraps for scoring
 		for my $fragment (@frag_list) {
+			my $scrap  = join ' ' => map { $score_hash{$_}++;
+										   $fragment->[-1]->{$_} } sort keys %{$fragment->[-1]};
 			my $phrase = join ' ' => map { $fragment->[1]->{$_}  } sort keys %{$fragment->[1]};
-			my $scrap  = join ' ' => map { $fragment->[-1]->{$_} } sort keys %{$fragment->[-1]};
 
-			for my $scrap_word (values %{$fragment->[-1]}) {
-				$score_hash{$scrap_word}++;
-			}
-
+			$score_hash{$f_word}++;
 			$inter_hash{$scrap}++;
 			$full_phrases{$phrase}++;
 		}
-
-		for my $scrap (keys %inter_hash) {
-			$score_hash{$f_word} += $inter_hash{$scrap};
-		}
 	}
+
 
 	$self->_set_score_hash( \%score_hash );
 	$self->_set_inter_hash( \%inter_hash );

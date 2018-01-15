@@ -16,7 +16,7 @@ my $highest = $phrase_list[0];
 for my $sen ( sort { $phrases->{$b} <=> $phrases->{$a} } keys %$phrases ) {
 	my $phrase = join ' ' => split /[^A-Za-z0-9-']+/ => $sen;
 	my $score = $phrases->{$sen} / $phrases->{$highest};
-	print $file "$phrase,$score\n";
+	#print $file "$phrase,$score\n";
 }
 
 close $file;
