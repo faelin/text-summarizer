@@ -264,7 +264,7 @@ sub summarize_file {
 	$self->analyze_phrases;		#
 			my $t3 = Benchmark->new;
 			my $td2 = timediff($t3, $t2);
-			say "\tPHRASE: ",timestr($td2);
+			say "\tANALYZE: ",timestr($td2);
 
 	$self->pretty_printer;
 
@@ -377,8 +377,8 @@ sub tokenize {
 	my @word_list;  # array literal of all the words in the entire text body
 	my @sen_words; # array reference to all of the tokens in each sentence
 	for (@sentences) {  #creates an array of each word in the current article that is not a stopword and is longer than the given *word_length_threshold*
-		my @temp = split /\W+/ => lc $_;
-		push @word_list => @temp;
+		my @temp = map { /\b (?:\w\.)+|(?:\w+(?:[['’-])?)+ (?=\s|\b)/gx } lc $_;
+		push @word_list =>  @temp;
 		push @sen_words => \@temp;
 	}
 
@@ -533,6 +533,16 @@ sub analyze_phrases {
 			$inter_hash{$scrap}++;
 			$full_phrases{$phrase}++;
 		}
+
+		my @keys = keys %inter_hash;
+		my @delete;
+		for my $scrap (@keys) {
+			for my $test (@keys) {
+				$inter_hash{$scrap} += $inter_hash{$test} and push @delete => $test if $scrap ne $test and $scrap =~ /$test/;
+			}
+		}
+
+		grep { delete $inter_hash{$_} } @delete;
 	}
 
 
