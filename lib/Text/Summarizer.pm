@@ -551,13 +551,14 @@ sub analyze_phrases {
 	CLEAR: for my $scrap (sort { $inter_hash{$b} <=> $inter_hash{$a} or $a cmp $b } keys %inter_hash) {
 		my $compare = qr/\b$scrap\b/;
 		my $delete  = 0;
-		for my $test (keys %inter_hash) {
+		TEST: for my $test (keys %inter_hash) {
 			if ($test ne $scrap) {
 				if ($test =~ /$compare/) { #true iff  *scrap* ∈ *test*
 					$inter_hash{$test} += $inter_hash{$scrap};
 					delete $inter_hash{$scrap} and next CLEAR;
 				} elsif (not scalar singleton (@{$bare_phrase{$test}}, @{$bare_phrase{$scrap}}) ) { #true iff *bare_phrase{test}* == *bare_phrase{scrap}*
-					next CLEAR unless scalar @{$bare_phrase{$test}} > 1;
+					next TEST unless scalar @{$bare_phrase{$test}} > 1;
+
 					my $joined = join '|' => @{$bare_phrase{$test}};
 					$inter_hash{"($joined)"} = $inter_hash{$test} + $inter_hash{$scrap};
 					$delete = 1;
