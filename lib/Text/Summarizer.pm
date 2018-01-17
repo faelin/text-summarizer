@@ -8,7 +8,7 @@ use warnings;
 use Lingua::Sentence;
 use Moo;
 use Types::Standard qw/ Ref Str Int Num InstanceOf /;
-use List::AllUtils qw/ max min sum /;
+use List::AllUtils qw/ max min sum singleton /;
 use Data::Dumper::Sorted qw/ Dumper /;
 use utf8;
 binmode STDOUT, ":utf8";
@@ -462,7 +462,7 @@ sub analyze_phrases {
 
 
 	#find common phrase-fragments
-	my (%inter_hash, %score_hash, %full_phrases); #*inter_hash* contains phrase fragments;  *score_hash* contains score values for words in those phrases
+	my (%inter_hash, %score_hash, %bare_phrase, %full_phrase); #*inter_hash* contains phrase fragments;  *score_hash* contains score values for words in those phrases
 	F_WORD: for my $f_word (keys %{$self->phrase_hash}) {
 
 
@@ -523,10 +523,13 @@ sub analyze_phrases {
 			my $scrap  = join ' ' => map { $score_hash{$_}++;
 										   $fragment->[-1]->{$_} } sort { $a <=> $b } keys %{$fragment->[-1]};
 			my $phrase = join ' ' => map { $fragment->[ 1]->{$_} } sort { $a <=> $b } keys %{$fragment->[ 1]};
+			my @bare   = map { $fragment->[-1]->{$_} } grep { !$self->stopwords->{$fragment->[-1]->{$_}} } sort { $a <=> $b } keys %{$fragment->[-1]};
 
-			$score_hash{$f_word}++;
-			$inter_hash{$scrap}++;
-			$full_phrases{$phrase}++;
+			$score_hash{$f_word}++;  #scores each *f_word*
+			$inter_hash{$scrap}++;   #contains the final *L_scrap*
+			$full_phrase{$phrase}++; #contains the full phrase from which the *L_scrap* was drawn
+
+			$bare_phrase{$scrap} = \@bare if scalar @bare;   #contains the final *L_scrap* without any stopwords
 		}
 	}
 
@@ -549,18 +552,25 @@ sub analyze_phrases {
 		my $compare = qr/\b$scrap\b/;
 		my $delete  = 0;
 		for my $test (keys %inter_hash) {
-			if ($test ne $scrap and $test =~ /$compare/) {
-				$inter_hash{$test} += $inter_hash{$scrap};
-				$delete = 1;
+			if ($test ne $scrap) {
+				if ($test =~ /$compare/) { #true iff  *scrap* ∈ *test*
+					$inter_hash{$test} += $inter_hash{$scrap};
+					delete $inter_hash{$scrap} and next CLEAR;
+				} elsif (not scalar singleton (@{$bare_phrase{$test}}, @{$bare_phrase{$scrap}}) ) { #true iff *bare_phrase{test}* == *bare_phrase{scrap}*
+					next CLEAR unless scalar @{$bare_phrase{$test}} > 1;
+					my $joined = join '|' => @{$bare_phrase{$test}};
+					$inter_hash{"($joined)"} = $inter_hash{$test} + $inter_hash{$scrap};
+					$delete = 1;
+					delete $inter_hash{$scrap} and next CLEAR;
+				}
 			}
 		}
-		delete $inter_hash{$scrap} if $delete;
 	}
 
 
 	$self->_set_score_hash(  \%score_hash );
 	$self->_set_inter_hash(  \%inter_hash );
-	$self->_set_phrase_list( \%full_phrases );
+	$self->_set_phrase_list( \%full_phrase );
 
 
 	return $self;
