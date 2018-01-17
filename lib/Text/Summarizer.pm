@@ -522,13 +522,12 @@ sub analyze_phrases {
 		 JOIN: for my $fragment (@frag_list) {
 			my $scrap  = join ' ' => map { $score_hash{$_}++;
 										   $fragment->[-1]->{$_} } sort { $a <=> $b } keys %{$fragment->[-1]};
-			my $phrase = join ' ' => map { $fragment->[ 1]->{$_} } sort { $a <=> $b } keys %{$fragment->[ 1]};
 			my @bare   = map { $fragment->[-1]->{$_} } grep { !$self->stopwords->{$fragment->[-1]->{$_}} } sort { $a <=> $b } keys %{$fragment->[-1]};
 
 			$score_hash{$f_word}++;  #scores each *f_word*
 			$inter_hash{$scrap}++;   #contains the final *L_scrap*
-			$full_phrase{$phrase}++; #contains the full phrase from which the *L_scrap* was drawn
 
+			$full_phrase{$self->phrase_hash->{$f_word}->[0]->[0]}++; #contains the full phrase from which the *L_scrap* was drawn
 			$bare_phrase{$scrap} = \@bare if scalar @bare;   #contains the final *L_scrap* without any stopwords
 		}
 	}
@@ -561,7 +560,7 @@ sub analyze_phrases {
 
 					my $joined = join '|' => @{$bare_phrase{$test}};
 					$inter_hash{"($joined)"} = $inter_hash{$test} + $inter_hash{$scrap};
-					$delete = 1;
+					$inter_hash{$test} += $inter_hash{$scrap};
 					delete $inter_hash{$scrap} and next CLEAR;
 				}
 			}
@@ -582,8 +581,15 @@ sub analyze_phrases {
 sub pretty_printer {
 	my $self = shift;
 
-	say "PHRASES:";
 
+	say "SUMMARY:";
+	for my $phrase (sort { $self->phrase_list->{$b} <=> $self->phrase_list->{$a} } keys %{$self->phrase_list}) {
+		say "\t" . $self->phrase_list->{$phrase} . " => " . $phrase;
+	}
+	say "\n";
+
+
+	say "PHRASES:";
 	my @phrase_keys = sort { $self->inter_hash->{$b} <=> $self->inter_hash->{$a} or $a cmp $b } keys %{$self->inter_hash};
 	for my $phrase (@phrase_keys[0..min($self->return_count,scalar @phrase_keys - 1)]) {
 		say "\t$phrase => " . $self->inter_hash->{$phrase};
@@ -598,7 +604,6 @@ sub pretty_printer {
 	}
 
 	say "WORDS:";
-
 	my @sort_list_keys = sort { $sort_list{$b} <=> $sort_list{$a} or $a cmp $b } keys %sort_list;
 	my $highest = $sort_list{$sort_list_keys[0]};
 		#my $average = sum(values %sort_list) / scalar @sort_list_keys;
