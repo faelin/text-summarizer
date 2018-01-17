@@ -527,7 +527,15 @@ sub analyze_phrases {
 			$score_hash{$f_word}++;  #scores each *f_word*
 			$inter_hash{$scrap}++;   #contains the final *L_scrap*
 
-			$full_phrase{$self->phrase_hash->{$f_word}->[0]->[0]}++; #contains the full phrase from which the *L_scrap* was drawn
+
+			my $score = 1;
+			for my $word (split ' ' => $scrap) {
+				$score += $freq_hash{$word}  // 0;
+				$score += $sigma_hash{$word} // 0;
+				$score += $score_hash{$word} // 0;
+			}
+
+			$full_phrase{$self->phrase_hash->{$f_word}->[0]->[0]} += $score; #contains the full phrase from which the *L_scrap* was drawn
 			$bare_phrase{$scrap} = \@bare if scalar @bare;   #contains the final *L_scrap* without any stopwords
 		}
 	}
