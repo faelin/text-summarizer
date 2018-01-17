@@ -381,7 +381,7 @@ sub tokenize {
 	my @word_list;  # array literal of all the words in the entire text body
 	my @sen_words; # array reference to all of the tokens in each sentence
 	for (@sentences) {  #creates an array of each word in the current article that is not a stopword and is longer than the given *word_length_threshold*
-		my @words = map { /\b (?: \w \. )+ | (?: \w+ ['’-]? )+ (?=\s|\b)/gx } lc $_;  #tokenizes each sentence into complete words (single-quotes are considered part of the word they attach to)
+		my @words = map { /\b (?: \w \. (?: ['’-] \w+ )?)+ | (?: \w+ ['’-]? )+ (?=\s|\b)/gx } lc $_;  #tokenizes each sentence into complete words (single-quotes are considered part of the word they attach to)
 		push @word_list =>  @words;
 		push @sen_words => \@words;
 	}
@@ -405,13 +405,13 @@ sub analyze_phrases {
 
 
 	my $min_freq_thresh = int($self->article_length * $self->freq_constant) // 1; #estimates a minimum threshold of occurence for frequently occuring words
-	my %frequency; #counts the number of times each word appears in the *%word_list* hash
+	my %freq_hash; #counts the number of times each word appears in the *%word_list* hash
 	for my $word (@{$self->word_list}) {
-	 	$frequency{$word}++ unless $self->stopwords->{$word};
+	 	$freq_hash{$word}++ unless $self->stopwords->{$word};
 	}
-	grep { delete $frequency{$_} if $frequency{$_} < $min_freq_thresh } keys %frequency;
+	grep { delete $freq_hash{$_} if $freq_hash{$_} < $min_freq_thresh } keys %freq_hash;
 		#remove words that appear less than the *$min_freq_thresh* (defaults to 1)
-	$self->_set_freq_hash( \%frequency );
+	$self->_set_freq_hash( \%freq_hash );
 
 
 	my (%cluster_hash, %cluster_count);
@@ -482,7 +482,7 @@ sub analyze_phrases {
 		#removes each word from the *word_hash* unless it occurs more than once amongst all phrases
 		SCRAP: for my $word_hash (@hash_list) {
 			for my $word (keys %{$word_hash->[-1]}) {
-				delete $word_hash->[-1]->{$_} unless $sum_list{$word_hash->[-1]->{$word}} > 1;
+				delete $word_hash->[-1]->{$word} unless $sum_list{$word_hash->[-1]->{$word}} > 1
 			}
 		}
 
@@ -522,24 +522,44 @@ sub analyze_phrases {
 		 JOIN: for my $fragment (@frag_list) {
 			my $scrap  = join ' ' => map { $score_hash{$_}++;
 										   $fragment->[-1]->{$_} } sort { $a <=> $b } keys %{$fragment->[-1]};
-			my $phrase = join ' ' => map { $fragment->[1]->{$_}  } sort { $a <=> $b } keys %{$fragment->[1]};
+			my $phrase = join ' ' => map { $fragment->[ 1]->{$_} } sort { $a <=> $b } keys %{$fragment->[ 1]};
 
 			$score_hash{$f_word}++;
 			$inter_hash{$scrap}++;
 			$full_phrases{$phrase}++;
 		}
+	}
 
 
-		CLEAR: for my $scrap (keys %inter_hash) {
-			for my $test (keys %inter_hash) {
-				$inter_hash{$scrap} += delete $inter_hash{$test} if $scrap ne $test and $scrap =~ /$test/;
-			}
+	#each phrases' score is multiplied by the sum of the compound score of each word within the phrase
+	for my $scrap (keys %inter_hash) {
+		for my $word (split ' ' => $scrap) {
+			my $score = 1;
+			$score += $freq_hash{$word}  // 0;
+			$score += $sigma_hash{$word} // 0;
+			$score += $score_hash{$word} // 0;
+
+			$inter_hash{$scrap} *= $score;
 		}
 	}
 
 
-	$self->_set_score_hash( \%score_hash );
-	$self->_set_inter_hash( \%inter_hash );
+	#combine scraps — if scrap "a" contains scrap "b", add the value of "b" to "a" and delete "b"
+	CLEAR: for my $scrap (sort { $inter_hash{$b} <=> $inter_hash{$a} or $a cmp $b } keys %inter_hash) {
+		my $compare = qr/\b$scrap\b/;
+		my $delete  = 0;
+		for my $test (keys %inter_hash) {
+			if ($test ne $scrap and $test =~ /$compare/) {
+				$inter_hash{$test} += $inter_hash{$scrap};
+				$delete = 1;
+			}
+		}
+		delete $inter_hash{$scrap} if $delete;
+	}
+
+
+	$self->_set_score_hash(  \%score_hash );
+	$self->_set_inter_hash(  \%inter_hash );
 	$self->_set_phrase_list( \%full_phrases );
 
 
@@ -553,7 +573,7 @@ sub pretty_printer {
 
 	say "PHRASES:";
 
-	my @phrase_keys = sort { $self->inter_hash->{$b} <=> $self->inter_hash->{$a} } keys %{$self->inter_hash};
+	my @phrase_keys = sort { $self->inter_hash->{$b} <=> $self->inter_hash->{$a} or $a cmp $b } keys %{$self->inter_hash};
 	for my $phrase (@phrase_keys[0..min($self->return_count,scalar @phrase_keys - 1)]) {
 		say "\t$phrase => " . $self->inter_hash->{$phrase};
 	} 
@@ -568,7 +588,7 @@ sub pretty_printer {
 
 	say "WORDS:";
 
-	my @sort_list_keys = sort { $sort_list{$b} <=> $sort_list{$a} } keys %sort_list;
+	my @sort_list_keys = sort { $sort_list{$b} <=> $sort_list{$a} or $a cmp $b } keys %sort_list;
 	my $highest = $sort_list{$sort_list_keys[0]};
 		#my $average = sum(values %sort_list) / scalar @sort_list_keys;
 	my $longest = max map {length} @sort_list_keys;
