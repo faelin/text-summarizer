@@ -1,15 +1,13 @@
 package Text::Summarizer;
 
-our $VERSION = "0.02";
+our $VERSION = "1.00";
 
 use v5.10.0;
 use strict;
 use warnings;
-use Lingua::Sentence;
 use Moo;
 use Types::Standard qw/ Ref Str Int Num InstanceOf /;
 use List::AllUtils qw/ max min sum singleton /;
-use Data::Dumper::Sorted qw/ Dumper /;
 use utf8;
 binmode STDOUT, ":utf8";
 
@@ -244,45 +242,30 @@ sub scan_all {
 
 
 
+sub summarize_text {
+	my ($self, $text) = @_;
+
+	$self->tokenize( $text );	#breaks the provided file into sentences and individual words
+	$self->analyze_phrases;		#analyzes the frequency and clustering of words within the provided file
+
+	return $self->summary;
+}
+
 #summarizing is used to extract common phrase fragments from a given text file.
 sub summarize_file {
-	my ($self, $filepath) = @_;
+	my ($self, $file_path) = @_;
 
-	open( my $file, '<:utf8', $filepath )
-		or die "Can't open $filepath: $!";
+	open( my $file, '<:utf8', $file_path )
+		or die "Can't open $file_path: $!";
 
-	say "\nSummary of file $filepath";
+	my $text = join "\n" => map { $_ } <$file>;
 
-	$self->watchlist;
-	$self->stopwords;
-
-			my $t1 = Benchmark->new;
-
-	$self->tokenize( $file );	#breaks the provided file into sentences and individual words
-			my $t2 = Benchmark->new;
-
-	$self->analyze_phrases;		#
-			my $t3 = Benchmark->new;
-
-
-			my $td1 = timediff($t2, $t1);
-			my $td2 = timediff($t3, $t2);
-			say "\t  SPLIT: ",timestr($td1);
-			say "\tANALYZE: ",timestr($td2);
-
-	$self->pretty_printer;
-
-
-
-	return $self;
+	return $self->summarize_text($text);
 }
 
 sub summarize_all {
-	my $self = shift;
-
-	$self->summarize_file( $_ ) foreach glob($self->articles_path);
-
-	return $self;
+	my ($self, $dir_path) = @_;
+	return map { $self->summarize_file( $_ ) } glob($dir_path // $self->articles_path);
 }
 
 
@@ -365,9 +348,9 @@ sub store_stoplist {
 
 
 sub tokenize {
-	my ( $self, $file ) = @_;
+	my ( $self, $text ) = @_;
 
-	my $full_text = join "\n" => map { $_ } <$file>;
+	my $full_text = $text;
 		#contains the full body of text
 	my @sentences = split qr/(?|   (?<=(?<!\s[djms]r) (?<!\s[djms]rs) \.  |  \!  |  \?)  \s+\n?
 							   |   \s{3,}
@@ -586,7 +569,31 @@ sub analyze_phrases {
 
 
 
-sub pretty_printer {
+#returns a summary array for the given text, in the form of a hash of array-refs:
+#	sentences => a list of full sentences from the given article, scored based on the scores of the words contained therein
+#	fragments => a list of phrase fragments from the given article, scored as above
+#	    words => a list of all words in the article, scored by a three-factor system consisting of
+#				(frequency of appearance, population mean deviation, and use in important phrase fragments)
+sub summary {
+	my $self = shift;
+
+	my %sort_list;
+	for (keys %{$self->freq_hash}) {
+		$sort_list{$_} += $self->freq_hash->{$_}  // 0;
+		$sort_list{$_} += $self->sigma_hash->{$_} // 0;
+		$sort_list{$_} += $self->score_hash->{$_} // 0;
+	}
+
+	my %sentences = map { ($_ => $self->phrase_list->{$_}) } sort { $self->phrase_list->{$b} <=> $self->phrase_list->{$a} } keys %{$self->phrase_list};
+	my %fragments = map { ($_ => $self->inter_hash->{$_})  } sort { $self->inter_hash->{$b} <=> $self->inter_hash->{$a} or $a cmp $b } keys %{$self->inter_hash};
+	my %singleton = map { ($_ => $sort_list{$_}) 		   } sort { $sort_list{$b} <=> $sort_list{$a} or $a cmp $b } keys %sort_list;
+
+	return [ sentences => \%sentences, fragments => \%fragments, words => \%singleton];
+}
+
+
+
+sub pretty_print {
 	my $self = shift;
 
 
@@ -604,33 +611,53 @@ sub pretty_printer {
 	} 
 	say "\n";
 
+
+	say "WORDS:";
 	my %sort_list;
 	for (keys %{$self->freq_hash}) {
 		$sort_list{$_} += $self->freq_hash->{$_}  // 0;
 		$sort_list{$_} += $self->sigma_hash->{$_} // 0;
 		$sort_list{$_} += $self->score_hash->{$_} // 0;
 	}
-
-	say "WORDS:";
 	my @sort_list_keys = sort { $sort_list{$b} <=> $sort_list{$a} or $a cmp $b } keys %sort_list;
 	my $highest = $sort_list{$sort_list_keys[0]};
 		#my $average = sum(values %sort_list) / scalar @sort_list_keys;
 	my $longest = max map {length} @sort_list_keys;
-	KEY: for ( @sort_list_keys[0..min($self->return_count,scalar @sort_list_keys - 1)] ) {
-		next KEY if $self->stopwords->{$_};
+	KEY: for my $word ( @sort_list_keys[0..min($self->return_count,scalar @sort_list_keys - 1)] ) {
+		next KEY if $self->stopwords->{$word};
 		my $format = "%" . $longest . "s|%s\n";
 		my $score = int(40*$sort_list{$_}/$highest);
-		printf $format => ( $_ , "-" x $score ) if $score > 2;
+		printf $format => ( $word , "-" x $score ) if $score > 2;
 	}
-	say "";
+	say "\n";
 
 	return $self;
 }
 
 
 
-
 1;
+__END__
 
 
 
+
+=head1 NAME
+
+Text::Summarizer - Summarize Bodies of Text
+
+=head1 SYNOPSIS
+
+	use Text::Summarizer;
+
+	my $summarizer = Text::Summarizer->new;
+
+	my $summary   = $summarizer->summarize_file("articles/article00.txt");
+		#or if you want to process in bulk
+	my @summaries = $summarizer->summarize_all("articles/*");
+
+	say ( $summary->{'sentences'}, $summary->{'fragments'}, $summary->{'words} );
+
+=head1 DESCRIPTION
+
+This module allows you to summarize bodies of text into a scored hash of I<sentences>, I<phrase-fragments>, and I<individual words> from the provided text.
