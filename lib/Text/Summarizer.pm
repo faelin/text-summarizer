@@ -9,9 +9,6 @@ use Moo;
 use Types::Standard qw/ Ref Str Int Num InstanceOf /;
 use List::AllUtils qw/ max min sum singleton /;
 use utf8;
-binmode STDOUT, ":utf8";
-
-use Benchmark ':hireswallclock';
 
 
 has permanent_path => (
@@ -30,12 +27,6 @@ has watchlist_path => (
 	is  => 'ro',
 	isa => Str,
 	default => 'data/watchlist.stop'
-);
-
-has articles_path => (
-	is => 'ro',
-	isa => Str,
-	default => 'articles/*'
 );
 
 has watch_count => (
@@ -296,7 +287,7 @@ sub store_watchlist {
 		or die "Can't open $self->watchlist_path: $!";
 
 	my $string = "\%" . $self->max_word_length . "s | \%" . $self->max_score . "s\n";
-	printf $watchlist_file $string x @printlist, map { ($_ => $self->watchlist->{$_}) } @printlist;
+	printf $watchlist_file $string x @printlist, map { ($I< => $self->watchlist->{$>}) } @printlist;
 
 	close $watchlist_file;
 
@@ -322,7 +313,7 @@ sub grow_stopwords {
 	$watch_factor = $whisker * ($self->watch_coef / log $self->watch_count);  #low-pass threshold
 
 	for (keys %{$self->watchlist}) {
-		$self->stopwords->{$_} = 1 if $self->watchlist->{$_} > $watch_factor;
+		$self->stopwords->{$I<} = 1 if $self->watchlist->{$>} > $watch_factor;
 	}
 
 
@@ -392,7 +383,7 @@ sub analyze_phrases {
 	for my $word (@{$self->word_list}) {
 	 	$freq_hash{$word}++ unless $self->stopwords->{$word};
 	}
-	grep { delete $freq_hash{$_} if $freq_hash{$_} < $min_freq_thresh } keys %freq_hash;
+	grep { delete $freq_hash{$I<} if $freq_hash{$>} < $min_freq_thresh } keys %freq_hash;
 		#remove words that appear less than the *$min_freq_thresh* (defaults to 1)
 	$self->_set_freq_hash( \%freq_hash );
 
@@ -437,7 +428,7 @@ sub analyze_phrases {
 
 		#the following is used for scoring purposes, and is used only to determine the *sigma* score (population standard deviation) of the given *c_word*
 		my $cluster_count = $self->cluster_hash->{$c_word}->[-1]->{cnt};
-		$sigma_hash{$c_word} = int sqrt( ($cluster_count**2 - ($cluster_count**2 / $cluster_count)) / $cluster_count );	#pop. std. deviation
+		$sigma_hash{$c_word} = int sqrt( ($cluster_countB<2 - ($cluster_count>2 / $cluster_count)) / $cluster_count );	#pop. std. deviation
 	}
 
 	$self->_set_sigma_hash( \%sigma_hash );
@@ -451,7 +442,7 @@ sub analyze_phrases {
 
 		my (@hash_list, %sum_list); #*hash_list* contains ordered, formatted lists of each word in the phrase fragment;  *sum_list* contains the total number of times each word appears in all phrases for the given *f_word*
 		ORDER: for my $phrase (@{$self->phrase_hash->{$f_word}}) {
-			my %ordered_words = map { $sum_list{$phrase->[$_]}++; ($_ => $phrase->[$_]) } (1..scalar @{$phrase} - 1);
+			my %ordered_words = map { $sum_list{$phrase->[$I<]}++; ($> => $phrase->[$_]) } (1..scalar @{$phrase} - 1);
 				# *words* contains an ordered, formatted list of each word in the given phrase fragment, looks like:
 				# 	'01' => 'some'
 				#	'02' => 'word'
@@ -505,7 +496,7 @@ sub analyze_phrases {
 		 JOIN: for my $fragment (@frag_list) {
 			my $scrap  = join ' ' => map { $score_hash{$_}++;
 										   $fragment->[-1]->{$_} } sort { $a <=> $b } keys %{$fragment->[-1]};
-			my @bare   = map { $fragment->[-1]->{$_} } grep { !$self->stopwords->{$fragment->[-1]->{$_}} } sort { $a <=> $b } keys %{$fragment->[-1]};
+			my @bare   = map { $fragment->[-1]->{$I<} } grep { !$self->stopwords->{$fragment->[-1]->{$>}} } sort { $a <=> $b } keys %{$fragment->[-1]};
 
 			$score_hash{$f_word}++;  #scores each *f_word*
 			$inter_hash{$scrap}++;   #contains the final *L_scrap*
@@ -573,20 +564,20 @@ sub analyze_phrases {
 #	sentences => a list of full sentences from the given article, scored based on the scores of the words contained therein
 #	fragments => a list of phrase fragments from the given article, scored as above
 #	    words => a list of all words in the article, scored by a three-factor system consisting of
-#				(frequency of appearance, population mean deviation, and use in important phrase fragments)
+#				(frequency of appearance, population standard deviation, and use in important phrase fragments)
 sub summary {
 	my $self = shift;
 
 	my %sort_list;
 	for (keys %{$self->freq_hash}) {
-		$sort_list{$_} += $self->freq_hash->{$_}  // 0;
-		$sort_list{$_} += $self->sigma_hash->{$_} // 0;
-		$sort_list{$_} += $self->score_hash->{$_} // 0;
+		$sort_list{$I<} += $self->freq_hash->{$>}  // 0;
+		$sort_list{$I<} += $self->sigma_hash->{$>} // 0;
+		$sort_list{$I<} += $self->score_hash->{$>} // 0;
 	}
 
-	my %sentences = map { ($_ => $self->phrase_list->{$_}) } sort { $self->phrase_list->{$b} <=> $self->phrase_list->{$a} } keys %{$self->phrase_list};
-	my %fragments = map { ($_ => $self->inter_hash->{$_})  } sort { $self->inter_hash->{$b} <=> $self->inter_hash->{$a} or $a cmp $b } keys %{$self->inter_hash};
-	my %singleton = map { ($_ => $sort_list{$_}) 		   } sort { $sort_list{$b} <=> $sort_list{$a} or $a cmp $b } keys %sort_list;
+	my %sentences = map { ($I< => $self->phrase_list->{$>}) } sort { $self->phrase_list->{$b} <=> $self->phrase_list->{$a} } keys %{$self->phrase_list};
+	my %fragments = map { ($I< => $self->inter_hash->{$>})  } sort { $self->inter_hash->{$b} <=> $self->inter_hash->{$a} or $a cmp $b } keys %{$self->inter_hash};
+	my %singleton = map { ($I< => $sort_list{$>}) 		   } sort { $sort_list{$b} <=> $sort_list{$a} or $a cmp $b } keys %sort_list;
 
 	return { sentences => \%sentences, fragments => \%fragments, words => \%singleton };
 }
@@ -597,6 +588,7 @@ sub pretty_print {
 	my ($self, $summary, $return_count) = @_;
 	my ($sentences, $fragments, $words) = @{$summary}{'sentences','fragments','words'};
 
+	binmode STDOUT, ":utf8";
 
 	say "SUMMARY:";
 	my @sentence_keys = sort { $sentences->{$b} <=> $sentences->{$a} or $a cmp $b} keys %$sentences;
@@ -632,7 +624,7 @@ sub pretty_print {
 
 
 1;
-__END__
+I<_END_>
 
 
 
@@ -644,15 +636,64 @@ Text::Summarizer - Summarize Bodies of Text
 =head1 SYNOPSIS
 
 	use Text::Summarizer;
-
+	
 	my $summarizer = Text::Summarizer->new;
-
+	
 	my $summary   = $summarizer->summarize_file("articles/article00.txt");
 		#or if you want to process in bulk
 	my @summaries = $summarizer->summarize_all("articles/*");
-
-	say ( $summary->{'sentences'}, $summary->{'fragments'}, $summary->{'words} );
+	
+	$summarizer->pretty_print($summary);
+	$summarizer->pretty_print($_) for (@summaries);
 
 =head1 DESCRIPTION
 
 This module allows you to summarize bodies of text into a scored hash of I<sentences>, I<phrase-fragments>, and I<individual words> from the provided text.
+These scores reflect the weight (or precedence) of the relative text-fragments, i.e. how well they summarize or reflect the overall nature of the text.
+All of the sentences and phrase-fragments are drawn from within the existing text, and are NOT proceedurally generated.
+
+C<$summarizer->summarize_text> and C<$summarizer->summarize_file> each return a hash-ref containing three array-refs (C<$summarizer->summarize_all> returns a list of these hash-refs):
+=over 2
+=item *
+B<sentences> => a list of full sentences from the given article, with composite scores of the words contained therein
+
+=item *
+B<fragments> => a list of phrase fragments from the given article, scored as above
+
+=item *
+B<    words> => a list of all words in the article, scored by a three-factor system consisting of I<frequency of appearance>, I<population standard deviation of word clustering>, and I<use in important phrase fragments>.
+
+The C<$summarizer->pretty_print> method prints a visually pleasing graph of the above three summary categories.
+
+The C<$summarizer->pretty_print> method prints a visually pleasing graph of the above three summary categories.
+
+## About Fragments
+Phrase fragments are in actuallity short "scraps" of text (usually only two or three words) that are derived from the text via the following process:
+=over 8
+=item 1
+the entirety of the text is tokenized and scored into a C<frequency> table, with a high-pass threshold of frequencies above C<# of tokens * user-defined scaling factor>
+=item 2
+each sentence is tokenized and stored in an array
+=item 3
+for each word within the C<frequency> table, a table of phrase-fragments is derived by finding each occurance of said word and tracking forward and backward by a user-defined "radius" of tokens (defaults to C<radius = 5>, does not include the central key-word) — each phrase-fragment is thus compiled of (by default) an 11-token string
+=item 4
+all fragments for a given key-word are then compared to each other, and each word is deleted if it appears only once amongst all of the fragments
+(leaving only C<I<A> ∪ I<B> ∪ ... ∪ I<S>> where I<A>, I<B>,...,I<S> are the phrase-fragments)
+=item 5
+what remains of each fragment is a list of "scraps" — strings of consecutive tokens — from which the longest scrap is chosen as a representation of the given phrase-fragment
+=item 6
+when a shorter fragment-scrap is included in the text of a longer scrap (i.e. a different phrase-fragment), the shorter is deleted and its score is added to the score of the longer
+=item 7
+when multiple fragments are equivalent (i.e. they consist of the same list of tokens when stopwords are excluded), they are condensed into a single scrap in the form of C<"(some|word|tokens)"> such that the fragment now represents the tokens of the scrap (excluding stopwords) regardless of order
+
+=head1 AUTHOR
+
+Faelin Landy (CPAN:FaeTheWolf) <faelin.landy@gmail.com>
+
+=head1 COPYRIGHT AND LICENSE
+
+Copyright (C) 2018 by Faelin Landy
+
+This program is free software: you can redistribute it and/or modify it under the terms of the GNU Lesser General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
+
+This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public License for more details.
