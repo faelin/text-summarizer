@@ -24,7 +24,7 @@ This module allows you to summarize bodies of text into a scored hash of  _sente
 
 - **fragments** => a list of phrase fragments from the given article, scored as above
 
-- **    words** => a list of all words in the article, scored by a three-factor system consisting of  _frequency of appearance_,  _population standard deviation_, and  _use in important phrase fragments_.
+- **words**     => a list of all words in the article, scored by a three-factor system consisting of  _frequency of appearance_,  _population standard deviation_, and  _use in important phrase fragments_.
 
 The `$summarizer->pretty_print` method prints a visually pleasing graph of the above three summary categories.
 
