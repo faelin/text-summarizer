@@ -588,50 +588,45 @@ sub summary {
 	my %fragments = map { ($_ => $self->inter_hash->{$_})  } sort { $self->inter_hash->{$b} <=> $self->inter_hash->{$a} or $a cmp $b } keys %{$self->inter_hash};
 	my %singleton = map { ($_ => $sort_list{$_}) 		   } sort { $sort_list{$b} <=> $sort_list{$a} or $a cmp $b } keys %sort_list;
 
-	return [ sentences => \%sentences, fragments => \%fragments, words => \%singleton];
+	return { sentences => \%sentences, fragments => \%fragments, words => \%singleton };
 }
 
 
 
 sub pretty_print {
-	my $self = shift;
+	my ($self, $summary, $return_count) = @_;
+	my ($sentences, $fragments, $words) = @{$summary}{'sentences','fragments','words'};
 
 
 	say "SUMMARY:";
-	for my $phrase (sort { $self->phrase_list->{$b} <=> $self->phrase_list->{$a} } keys %{$self->phrase_list}) {
-		say "\t" . $self->phrase_list->{$phrase} . " => " . $phrase;
+	my @sentence_keys = sort { $sentences->{$b} <=> $sentences->{$a} or $a cmp $b} keys %$sentences;
+	for my $sen ( @sentence_keys[0..min($return_count,scalar @sentence_keys - 1)] ) {
+		printf "%4d => %100s\n" => $sentences->{$sen}, $sen;
 	}
 	say "\n";
 
 
 	say "PHRASES:";
-	my @phrase_keys = sort { $self->inter_hash->{$b} <=> $self->inter_hash->{$a} or $a cmp $b } keys %{$self->inter_hash};
-	for my $phrase (@phrase_keys[0..min($self->return_count,scalar @phrase_keys - 1)]) {
-		say "\t$phrase => " . $self->inter_hash->{$phrase};
+	my @phrase_keys = sort { $fragments->{$b} <=> $fragments->{$a} or $a cmp $b } keys %$fragments;
+	for my $phrase ( @phrase_keys[0..min($return_count,scalar @phrase_keys - 1)] ) {
+		printf "%8d => %s\n" => $fragments->{$phrase}, $phrase;
 	} 
 	say "\n";
 
 
-	say "WORDS:";
-	my %sort_list;
-	for (keys %{$self->freq_hash}) {
-		$sort_list{$_} += $self->freq_hash->{$_}  // 0;
-		$sort_list{$_} += $self->sigma_hash->{$_} // 0;
-		$sort_list{$_} += $self->score_hash->{$_} // 0;
-	}
-	my @sort_list_keys = sort { $sort_list{$b} <=> $sort_list{$a} or $a cmp $b } keys %sort_list;
-	my $highest = $sort_list{$sort_list_keys[0]};
-		#my $average = sum(values %sort_list) / scalar @sort_list_keys;
-	my $longest = max map {length} @sort_list_keys;
-	KEY: for my $word ( @sort_list_keys[0..min($self->return_count,scalar @sort_list_keys - 1)] ) {
-		next KEY if $self->stopwords->{$word};
+	say "  WORDS:";
+	my @word_keys = sort { $words->{$b} <=> $words->{$a} or $a cmp $b } keys %$words;
+	my $highest = $words->{$word_keys[0]};
+	my $longest = max map {length} @word_keys;
+	KEY: for my $word ( @word_keys[0..min($return_count,scalar @word_keys - 1)] ) {
 		my $format = "%" . $longest . "s|%s\n";
-		my $score = int(40*$sort_list{$_}/$highest);
+		my $score = int(40*$words->{$word}/$highest);
 		printf $format => ( $word , "-" x $score ) if $score > 2;
 	}
 	say "\n";
 
-	return $self;
+
+	return $summary;
 }
 
 
