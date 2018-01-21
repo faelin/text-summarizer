@@ -15,7 +15,7 @@ require Exporter;
 @EXPORT = qw();
 @EXPORT_OK = qw();
 %EXPORT_TAGS = (all => [@EXPORT_OK]);
-$VERSION = '1.0202';
+$VERSION = '1.0203';
 
 
 has permanent_path => (
@@ -652,10 +652,8 @@ C<$summarizer->summarize_text> and C<$summarizer->summarize_file> each return a 
 =over 2
 =item *
 B<sentences> => a list of full sentences from the given article, with composite scores of the words contained therein
-
 =item *
 B<fragments> => a list of phrase fragments from the given article, scored as above
-
 =item *
 B<    words> => a list of all words in the article, scored by a three-factor system consisting of I<frequency of appearance>, I<population standard deviation of word clustering>, and I<use in important phrase fragments>.
 
