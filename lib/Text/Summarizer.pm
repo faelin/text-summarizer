@@ -15,7 +15,7 @@ require Exporter;
 @EXPORT = qw();
 @EXPORT_OK = qw();
 %EXPORT_TAGS = (all => [@EXPORT_OK]);
-$VERSION = '1.02';
+$VERSION = '1.0202';
 
 
 has permanent_path => (
@@ -621,6 +621,9 @@ __END__
 
 	
 
+=pod
+ 
+=encoding utf-8
 
 =head1 NAME
 
@@ -659,6 +662,7 @@ B<    words> => a list of all words in the article, scored by a three-factor sys
 The C<$summarizer->pretty_print> method prints a visually pleasing graph of the above three summary categories.
 
 The C<$summarizer->pretty_print> method prints a visually pleasing graph of the above three summary categories.
+=back
 
 ## About Fragments
 Phrase fragments are in actuallity short "scraps" of text (usually only two or three words) that are derived from the text via the following process:
@@ -668,7 +672,7 @@ the entirety of the text is tokenized and scored into a C<frequency> table, with
 =item 2
 each sentence is tokenized and stored in an array
 =item 3
-for each word within the C<frequency> table, a table of phrase-fragments is derived by finding each occurance of said word and tracking forward and backward by a user-defined "radius" of tokens (defaults to C<radius = 5>, does not include the central key-word) — each phrase-fragment is thus compiled of (by default) an 11-token string
+for each word within the C<frequency> table, a table of phrase-fragments is derived by finding each occurance of said word and tracking forward and backward by a user-defined "radius" of tokens (defaults to C<radius = 5>, does not include the central key-word) -- each phrase-fragment is thus compiled of (by default) an 11-token string
 =item 4
 all fragments for a given key-word are then compared to each other, and each word is deleted if it appears only once amongst all of the fragments
 (leaving only C<I<A> ∪ I<B> ∪ ... ∪ I<S>> where I<A>, I<B>,...,I<S> are the phrase-fragments)
@@ -678,6 +682,7 @@ what remains of each fragment is a list of "scraps" — strings of consecutive t
 when a shorter fragment-scrap is included in the text of a longer scrap (i.e. a different phrase-fragment), the shorter is deleted and its score is added to the score of the longer
 =item 7
 when multiple fragments are equivalent (i.e. they consist of the same list of tokens when stopwords are excluded), they are condensed into a single scrap in the form of C<"(some|word|tokens)"> such that the fragment now represents the tokens of the scrap (excluding stopwords) regardless of order
+=back
 
 =head1 AUTHOR
 

@@ -1,12 +1,12 @@
 Build.PL
-lib/Text/Summarizer.pm
-LICENSE
-MANIFEST			This list of files
-README.md
-scripts/SummarizeAll.pl
 data/permanent.stop
 data/stopwords.stop
 data/watchlist.stop
+lib/Text/Summarizer.pm
+LICENSE
 Makefile.PL
-META.yml
+MANIFEST			This list of files
 META.json
+META.yml
+README.md
+scripts/SummarizeAll.pl

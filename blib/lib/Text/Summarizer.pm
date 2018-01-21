@@ -1,7 +1,5 @@
 package Text::Summarizer;
 
-our $VERSION = "1.02";
-
 use v5.10.0;
 use strict;
 use warnings;
@@ -9,6 +7,15 @@ use Moo;
 use Types::Standard qw/ Ref Str Int Num InstanceOf /;
 use List::AllUtils qw/ max min sum singleton /;
 use utf8;
+
+use vars qw(@ISA @EXPORT @EXPORT_OK %EXPORT_TAGS $VERSION);
+require Exporter;
+
+@ISA = qw(Exporter);
+@EXPORT = qw();
+@EXPORT_OK = qw();
+%EXPORT_TAGS = (all => [@EXPORT_OK]);
+$VERSION = '1.0202';
 
 
 has permanent_path => (
@@ -612,8 +619,11 @@ sub pretty_print {
 1;
 __END__
 
+	
 
-
+=pod
+ 
+=encoding utf-8
 
 =head1 NAME
 
@@ -652,6 +662,7 @@ B<    words> => a list of all words in the article, scored by a three-factor sys
 The C<$summarizer->pretty_print> method prints a visually pleasing graph of the above three summary categories.
 
 The C<$summarizer->pretty_print> method prints a visually pleasing graph of the above three summary categories.
+=back
 
 ## About Fragments
 Phrase fragments are in actuallity short "scraps" of text (usually only two or three words) that are derived from the text via the following process:
@@ -671,6 +682,7 @@ what remains of each fragment is a list of "scraps" — strings of consecutive t
 when a shorter fragment-scrap is included in the text of a longer scrap (i.e. a different phrase-fragment), the shorter is deleted and its score is added to the score of the longer
 =item 7
 when multiple fragments are equivalent (i.e. they consist of the same list of tokens when stopwords are excluded), they are condensed into a single scrap in the form of C<"(some|word|tokens)"> such that the fragment now represents the tokens of the scrap (excluding stopwords) regardless of order
+=back
 
 =head1 AUTHOR
 

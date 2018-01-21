@@ -168,6 +168,7 @@ All of the sentences and phrase-fragments are drawn from within the existing tex
 The \f(CW\*(C`$summarizer\-\*(C'\fRpretty_print> method prints a visually pleasing graph of the above three summary categories.
 .Sp
 The \f(CW\*(C`$summarizer\-\*(C'\fRpretty_print> method prints a visually pleasing graph of the above three summary categories.
+=back
 .Sp
 ## About Fragments
 Phrase fragments are in actuallity short \*(L"scraps\*(R" of text (usually only two or three words) that are derived from the text via the following process:
@@ -187,6 +188,7 @@ what remains of each fragment is a list of \*(L"scraps\*(R" X strings of consecu
 when a shorter fragment-scrap is included in the text of a longer scrap (i.e. a different phrase-fragment), the shorter is deleted and its score is added to the score of the longer
 =item 7
 when multiple fragments are equivalent (i.e. they consist of the same list of tokens when stopwords are excluded), they are condensed into a single scrap in the form of \f(CW"(some|word|tokens)"\fR such that the fragment now represents the tokens of the scrap (excluding stopwords) regardless of order
+=back
 .SH "AUTHOR"
 .IX Header "AUTHOR"
 Faelin Landy (CPAN:FaeTheWolf) <faelin.landy@gmail.com>
@@ -200,12 +202,9 @@ This program is distributed in the hope that it will be useful, but \s-1WITHOUT 
 .SH "POD ERRORS"
 .IX Header "POD ERRORS"
 Hey! \fBThe above document had some coding errors, which are explained below:\fR
-.IP "Around line 646:" 4
-.IX Item "Around line 646:"
+.IP "Around line 656:" 4
+.IX Item "Around line 656:"
 \&'=item' outside of any '=over'
-.IP "Around line 664:" 4
-.IX Item "Around line 664:"
-Non-ASCII character seen before =encoding in 'X'. Assuming \s-1UTF\-8\s0
-.IP "Around line 675:" 4
-.IX Item "Around line 675:"
+.IP "Around line 687:" 4
+.IX Item "Around line 687:"
 You forgot a '=back' before '=head1'
