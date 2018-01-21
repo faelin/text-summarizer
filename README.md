@@ -34,7 +34,7 @@ Phrase fragments are in actuallity short "scraps" of text (usually only two or t
 2. each sentence is tokenized and stored in an array
 3. for each word within the `frequency` table, a table of phrase-fragments is derived by finding each occurance of said word and tracking forward and backward by a user-defined "radius" of tokens (defaults to `radius = 5`, does not include the central key-word) — each phrase-fragment is thus compiled of (by default) an 11-token string
 4. all fragments for a given key-word are then compared to each other, and each word is deleted if it appears only once amongst all of the fragments
-(leaving only <code>_A_ ∪ _B_ ∪ ... ∪ _S_</code> where _A_, _B_,...,_S_ are the phrase-fragments)
+(leaving only <code>_A_ ∪ _B_ ∪ ... ∪ _S_</code> where _A_, _B_,..., _S_ are the phrase-fragments)
 5. what remains of each fragment is a list of "scraps" — strings of consecutive tokens — from which the longest scrap is chosen as a representation of the given phrase-fragment
 6. when a shorter fragment-scrap is included in the text of a longer scrap (i.e. a different phrase-fragment), the shorter is deleted and its score is added to the score of the longer
 7. when multiple fragments are equivalent (i.e. they consist of the same list of tokens when stopwords are excluded), they are condensed into a single scrap in the form of `"(some|word|tokens)"` such that the fragment now represents the tokens of the scrap (excluding stopwords) regardless of order

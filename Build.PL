@@ -14,11 +14,9 @@ my $builder = Module::Build->new(
         'Carp'         => 0,
     },
     requires => {
-        'Lingua::Sentence'  => '1.100',
-        'Moo'               => '2.003002',
+        'Moo'               => '2.003004',
         'Types::Standard'   => 0,
         'List::AllUtils'    => 0,
-        'Data::Dumper'      => 0,
     },
     add_to_cleanup      => [ 'Text::Summarizer-*' ],
     create_makefile_pl => 'traditional',
