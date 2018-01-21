@@ -1,5 +1,7 @@
 package Text::Summarizer;
 
+our $VERSION = "1.02";
+
 use v5.10.0;
 use strict;
 use warnings;
@@ -7,15 +9,6 @@ use Moo;
 use Types::Standard qw/ Ref Str Int Num InstanceOf /;
 use List::AllUtils qw/ max min sum singleton /;
 use utf8;
-
-use vars qw(@ISA @EXPORT @EXPORT_OK %EXPORT_TAGS $VERSION);
-require Exporter;
-
-@ISA = qw(Exporter);
-@EXPORT = qw();
-@EXPORT_OK = qw();
-%EXPORT_TAGS = (all => [@EXPORT_OK]);
-$VERSION = '1.02';
 
 
 has permanent_path => (
@@ -619,7 +612,7 @@ sub pretty_print {
 1;
 __END__
 
-	
+
 
 
 =head1 NAME
