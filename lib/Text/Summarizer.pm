@@ -1,6 +1,6 @@
 package Text::Summarizer;
 
-our $VERSION = "1.00";
+our $VERSION = "1.01";
 
 use v5.10.0;
 use strict;
@@ -12,56 +12,70 @@ use utf8;
 
 
 has permanent_path => (
-	is  => 'ro',
+	is  => 'rw',
 	isa => Str,
 	default => 'data/permanent.stop',
 );
 
 has stopwords_path => (
-	is  => 'ro',
+	is  => 'rw',
 	isa => Str,
 	default => 'data/stopwords.stop',
 );
 
 has watchlist_path => (
-	is  => 'ro',
+	is  => 'rw',
 	isa => Str,
 	default => 'data/watchlist.stop'
 );
 
-has watch_count => (
-	is => 'rwp',
-	isa => Int,
-	default => 0,
+has articles_path => (
+	is => 'rw',
+	isa => Str,
+	default => 'articles/*'
 );
 
-has watch_coef => (
-	is => 'rwp',
-	isa => Int,
-	default => 30,
+has freq_constant => (
+	is => 'ro',
+	isa => Num,
+	default => 0.004,
 );
 
-has phrase_list => (
-	is => 'rwp',
-	isa => Ref['HASH'],
+has word_length_threshold => (
+	is => 'ro',
+	isa => Int,
+	default => 3,
 );
 
 has phrase_radius => (
-	is => 'rwp',
+	is => 'ro',
 	isa => Int,
 	default => 5,
 );
 
 has phrase_threshold => (
-	is => 'rwp',
+	is => 'ro',
 	isa => Int,
 	default => 2,
 );
 
 has phrase_min => (
-	is => 'rwp',
+	is => 'ro',
 	isa => Int,
 	default => 2,
+);
+
+has watch_coef => (
+	is => 'ro',
+	isa => Int,
+	default => 30,
+);
+
+
+has watch_count => (
+	is => 'rwp',
+	isa => Int,
+	default => 0,
 );
 
 has watchlist => (
@@ -86,6 +100,11 @@ has full_text => (
 has sentences => (
 	is => 'rwp',
 	isa => Ref['ARRAY'],
+);
+
+has phrase_list => (
+	is => 'rwp',
+	isa => Ref['HASH'],
 );
 
 has word_list => (
@@ -128,36 +147,12 @@ has score_hash => (
 	isa => Ref['HASH'],
 );
 
-has max_word_length => (
-	is => 'rwp',
-	isa => Int,
-	default => 0,
-);
-
-has word_length_threshold => (
-	is => 'rwp',
-	isa => Int,
-	default => 3,
-);
-
 has article_length => (
 	is => 'rwp',
 	isa => Int,
 	default => 0,
 	lazy => 1,
-);
-
-has max_score => (
-	is => 'rwp',
-	isa => Int,
-	default => 0,
-);
-
-has freq_constant => (
-	is => 'rwp',
-	isa => Num,
-	default => 0.004,
-);
+)
 
 has return_count => (
 	is => 'rwp',
@@ -179,9 +174,7 @@ sub load_watchlist {
 	}
 	close $watchlist_file;
 
-	$self->_set_watch_count( sum values %watch_list // 0 );  #counts the total number of watch_words ever collected
-	$self->_set_max_word_length( max map { length } keys %watch_list // 0 );  #generates the length of the longest word collected
-	$self->_set_max_score( max map { length } values %watch_list // 0 );  #generates the length of the longest score collected
+	$self->_set_watch_count( sum values %{$self->watchlist} // 0 );  #counts the total number of watch_words ever collected
 
 	return \%watch_list;
 }
@@ -192,13 +185,12 @@ sub load_stopwords {
 
 	open( my $permanent_file, '<', $self->permanent_path )
  		or die "Can't open " . $self->permanent_path . ": $!";
+	chomp and $stopwords{ $_ } = 1 for (<$permanent_file>);
+	close $permanent_file;
+
 	open( my $stopwords_file, '<', $self->stopwords_path )
 		or die "Can't open " . $self->stopwords_path . ": $!";
-
-	chomp and $stopwords{ $_ } = 1 for (<$permanent_file>);
 	chomp and $stopwords{ $_ } = 1 for (<$stopwords_file>);
-
-	close $permanent_file;
 	close $stopwords_file;
 
 	return \%stopwords;
@@ -208,9 +200,9 @@ sub load_stopwords {
 
 #scanning is used to augment the *watchlist* and *stopwords* attributes
 sub scan_file {
-	my ($self, $filepath) = @_;
+	my ($self, $file_path) = @_;
 
-	open( my $file, "<", $filepath )
+	open( my $file, "<", $file_path )
 		or die "Can't open $filepath: $!";
 
 	say "\nAnalyzing file $filepath";
@@ -224,9 +216,83 @@ sub scan_file {
 }
 
 sub scan_all {
+	my ($self, $dir_path = @_;
+
+	$self->scan_file( $_ ) foreach glob($dir_path // $self->articles_path);
+
+	return $self;
+}
+
+sub grow_watchlist {
+	my ($self, $file) = @_;
+
+	for (<$file>) {
+		for my $word ( map { /\b (?: \w \. (?: ['’-] \w+ )?)+ | (?: \w+ ['’-]? )+ (?=\s|\b)/gx } lc $_ ) {
+			$self->watchlist->{$word}++ unless ( exists $self->stopwords->{$word} );
+		}
+	}
+
+	$self->_set_watch_count( sum values %{$self->watchlist} // 0 );  #counts the total number of watch_words ever collected
+
+	return $self;
+}
+
+sub grow_stopwords {
+	my ( $self, $file ) = @_;
+	my ( $watch_factor, $watch_length, $avgfreq );
+
+	$watch_length = scalar keys %{$self->watchlist}; #total number of words in the WATCH_LIST
+	$avgfreq = $watch_length ? $self->watch_count / $watch_length : 0; #average frequency of words in WATCH_LIST
+
+	my ($low, $lower, $upper, $high) = ($avgfreq, 0, 0, $avgfreq);
+	for my $score (values %{$self->watchlist}) {
+		$score > $avgfreq ? $upper += $score : $lower += $score;
+		$high = max( $score => $high );
+		$low  = min( $score => $low  );
+	}
+
+	my $normal    = ($watch_length / 2);  #normalization scalar
+	my $whisker   = (3 * $upper - $lower) / (2 * $normal);  #upper whisker
+	$watch_factor = $whisker * ($self->watch_coef / log $self->watch_count);  #low-pass threshold
+
+	for (keys %{$self->watchlist}) {
+		$self->stopwords->{$_} = 1 if $self->watchlist->{$_} > $watch_factor;
+	}
+
+
+	$upper /=  $normal;
+	$lower /=  $normal;
+	say "lower = $lower; mid = $avgfreq; upper = $upper";
+	say "upper whisker = $whisker";
+	say "avg freq = $avgfreq";
+	say "factor = $watch_factor";
+}
+
+sub store_watchlist {
 	my $self = shift;
 
-	$self->scan_file( $_ ) foreach glob($self->articles_path);
+	my @printlist = sort { $self->watchlist->{$b} <=> $self->watchlist->{$a} } keys %{$self->watchlist};
+
+	my $max_word_length = max map { length } keys %{$self->watchlist};  #generates the length of the longest word collected
+	my $max_score_length = max map { length } values %{$self->watchlist};  #generates the length of the longest score collected
+
+	my $format = "\%" . $max_word_length . "s | \%" . $max_score_length . "s\n";
+
+	open( my $watchlist_file, ">", $self->watchlist_path )
+		or die "Can't open $self->watchlist_path: $!";
+	printf $watchlist_file $format x @printlist, map { ($_ => $self->watchlist->{$_}) } @printlist;
+	close $watchlist_file;
+
+	return $self;
+}
+
+sub store_stoplist {
+	my $self = shift;
+
+	open( my $stopwords_file, ">", $self->stopwords_path)
+		or die "Can't open $self->stopwords_file: $!";
+	print $stopwords_file "$_\n" for sort keys %{$self->stopwords};
+	close $stopwords_file;
 
 	return $self;
 }
@@ -257,83 +323,6 @@ sub summarize_file {
 sub summarize_all {
 	my ($self, $dir_path) = @_;
 	return map { $self->summarize_file( $_ ) } glob($dir_path // $self->articles_path);
-}
-
-
-
-sub grow_watchlist {
-	my ($self, $file) = @_;
-
-	for (<$file>) {
-		while ( m/ ([A-Za-z]+ (?:['’][A-Za-z]+|[[A-Za-z]-[sS]])* ) /xg ) {
-			my $word = lc $1;
-			$self->watchlist->{$word}++ unless ( exists $self->stopwords->{$word} );
-		}
-	}
-
-	$self->_set_watch_count( sum values %{$self->watchlist} // 0 );  #counts the total number of watch_words ever collected
-	$self->_set_max_word_length( max map { length } keys %{$self->watchlist} );  #generates the length of the longest word collected
-	$self->_set_max_score( max map { length } values %{$self->watchlist} );  #generates the length of the longest score collected
-
-	return $self;
-}
-
-sub store_watchlist {
-	my $self = shift;
-
-	my @printlist = sort { $self->watchlist->{$b} <=> $self->watchlist->{$a} } keys %{$self->watchlist};
-
-	open( my $watchlist_file, ">", $self->watchlist_path )
-		or die "Can't open $self->watchlist_path: $!";
-
-	my $string = "\%" . $self->max_word_length . "s | \%" . $self->max_score . "s\n";
-	printf $watchlist_file $string x @printlist, map { ($I< => $self->watchlist->{$>}) } @printlist;
-
-	close $watchlist_file;
-
-	return $self;
-}
-
-sub grow_stopwords {
-	my ( $self, $file ) = @_;
-	my ( $watch_factor, $watch_length, $avgfreq );
-
-	$watch_length = scalar keys %{$self->watchlist}; #total number of words in the WATCH_LIST
-	$avgfreq = $watch_length ? $self->watch_count / $watch_length : 0; #average frequency of words in WATCH_LIST
-
-	my ($low, $lower, $upper, $high) = ($avgfreq, 0, 0, $avgfreq);
-	for my $score (values %{$self->watchlist}) {
-		$score > $avgfreq ? $upper += $score : $lower += $score;
-		$high = max( $score => $high );
-		$low  = min( $score => $low  );
-	}
-
-	my $normal    = ($watch_length / 2);  #normalization scalar
-	my $whisker   = (3 * $upper - $lower) / (2 * $normal);  #upper whisker
-	$watch_factor = $whisker * ($self->watch_coef / log $self->watch_count);  #low-pass threshold
-
-	for (keys %{$self->watchlist}) {
-		$self->stopwords->{$I<} = 1 if $self->watchlist->{$>} > $watch_factor;
-	}
-
-
-	$upper /=  $normal;
-	$lower /=  $normal;
-	say "lower = $lower; mid = $avgfreq; upper = $upper";
-	say "upper whisker = $whisker";
-	say "avg freq = $avgfreq";
-	say "factor = $watch_factor";
-}
-
-sub store_stoplist {
-	my $self = shift;
-
-	open( my $stopwords_file, ">", $self->stopwords_path)
-		or die "Can't open $self->stopwords_file: $!";
-	print $stopwords_file "$_\n" for sort keys %{$self->stopwords};
-	close $stopwords_file;
-
-	return $self;
 }
 
 
@@ -383,7 +372,7 @@ sub analyze_phrases {
 	for my $word (@{$self->word_list}) {
 	 	$freq_hash{$word}++ unless $self->stopwords->{$word};
 	}
-	grep { delete $freq_hash{$I<} if $freq_hash{$>} < $min_freq_thresh } keys %freq_hash;
+	grep { delete $freq_hash{$_} if $freq_hash{$_} < $min_freq_thresh } keys %freq_hash;
 		#remove words that appear less than the *$min_freq_thresh* (defaults to 1)
 	$self->_set_freq_hash( \%freq_hash );
 
@@ -442,7 +431,7 @@ sub analyze_phrases {
 
 		my (@hash_list, %sum_list); #*hash_list* contains ordered, formatted lists of each word in the phrase fragment;  *sum_list* contains the total number of times each word appears in all phrases for the given *f_word*
 		ORDER: for my $phrase (@{$self->phrase_hash->{$f_word}}) {
-			my %ordered_words = map { $sum_list{$phrase->[$I<]}++; ($> => $phrase->[$_]) } (1..scalar @{$phrase} - 1);
+			my %ordered_words = map { $sum_list{$phrase->[$_]}++; ($_ => $phrase->[$_]) } (1..scalar @{$phrase} - 1);
 				# *words* contains an ordered, formatted list of each word in the given phrase fragment, looks like:
 				# 	'01' => 'some'
 				#	'02' => 'word'
@@ -496,7 +485,7 @@ sub analyze_phrases {
 		 JOIN: for my $fragment (@frag_list) {
 			my $scrap  = join ' ' => map { $score_hash{$_}++;
 										   $fragment->[-1]->{$_} } sort { $a <=> $b } keys %{$fragment->[-1]};
-			my @bare   = map { $fragment->[-1]->{$I<} } grep { !$self->stopwords->{$fragment->[-1]->{$>}} } sort { $a <=> $b } keys %{$fragment->[-1]};
+			my @bare   = map { $fragment->[-1]->{$_} } grep { !$self->stopwords->{$fragment->[-1]->{$_}} } sort { $a <=> $b } keys %{$fragment->[-1]};
 
 			$score_hash{$f_word}++;  #scores each *f_word*
 			$inter_hash{$scrap}++;   #contains the final *L_scrap*
@@ -570,14 +559,14 @@ sub summary {
 
 	my %sort_list;
 	for (keys %{$self->freq_hash}) {
-		$sort_list{$I<} += $self->freq_hash->{$>}  // 0;
-		$sort_list{$I<} += $self->sigma_hash->{$>} // 0;
-		$sort_list{$I<} += $self->score_hash->{$>} // 0;
+		$sort_list{$_} += $self->freq_hash->{$_}  // 0;
+		$sort_list{$_} += $self->sigma_hash->{$_} // 0;
+		$sort_list{$_} += $self->score_hash->{$_} // 0;
 	}
 
-	my %sentences = map { ($I< => $self->phrase_list->{$>}) } sort { $self->phrase_list->{$b} <=> $self->phrase_list->{$a} } keys %{$self->phrase_list};
-	my %fragments = map { ($I< => $self->inter_hash->{$>})  } sort { $self->inter_hash->{$b} <=> $self->inter_hash->{$a} or $a cmp $b } keys %{$self->inter_hash};
-	my %singleton = map { ($I< => $sort_list{$>}) 		   } sort { $sort_list{$b} <=> $sort_list{$a} or $a cmp $b } keys %sort_list;
+	my %sentences = map { ($_ => $self->phrase_list->{$_}) } sort { $self->phrase_list->{$b} <=> $self->phrase_list->{$a} } keys %{$self->phrase_list};
+	my %fragments = map { ($_ => $self->inter_hash->{$_})  } sort { $self->inter_hash->{$b} <=> $self->inter_hash->{$a} or $a cmp $b } keys %{$self->inter_hash};
+	my %singleton = map { ($_ => $sort_list{$_}) 		   } sort { $sort_list{$b} <=> $sort_list{$a} or $a cmp $b } keys %sort_list;
 
 	return { sentences => \%sentences, fragments => \%fragments, words => \%singleton };
 }
@@ -624,7 +613,7 @@ sub pretty_print {
 
 
 1;
-I<_END_>
+__END__
 
 
 
@@ -697,3 +686,4 @@ Copyright (C) 2018 by Faelin Landy
 This program is free software: you can redistribute it and/or modify it under the terms of the GNU Lesser General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 
 This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public License for more details.
+

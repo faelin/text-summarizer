@@ -2,10 +2,10 @@
 use lib 'lib';
 use Text::Summarizer;
 
-my $summarizer = Text::Summarizer->new;
+my $summarizer = Text::Summarizer->new(articles_path => "articles/*");
 
 # $summarizer->scan_all;
-my @summaries = $summarizer->summarize_all("articles/*");
+my @summaries = $summarizer->summarize_all();
 my $file_summ = $summarizer->summarize_file("articles/article00.txt");
 my $text_summ = $summarizer->summarize_text(<<'END_SAMPLE');
 
@@ -14,7 +14,7 @@ my $text_summ = $summarizer->summarize_text(<<'END_SAMPLE');
 	was things which he stretched, but mainly he told the truth. That is nothing. I never seen anybody 
 	but lied one time or another, without it was Aunt Polly, or the widow, or maybe Mary. Aunt 
 	Polly—Tom’s Aunt Polly, she is—and Mary, and the Widow Douglas is all told about in that book, 
-	which is mostly a true book, with some stretchers, as I said before.Now the way that the book winds 
+	which is mostly a true book, with some stretchers, as I said before. Now the way that the book winds 
 	up is this: Tom and me found the money that the robbers hid in the cave, and it made us rich. We got 
 	six thousand dollars apiece—all gold. It was an awful sight of money when it was piled up. Well, 
 	Judge Thatcher he took it and put it out at interest, and it fetched us a dollar a day apiece all 
@@ -35,7 +35,7 @@ $summarizer->pretty_print($file_summ, 20);
 
 # open( my $file, '>>', sprintf( "data/phrases.csv", $i) )
 # 		or die "Can't open data/phrases.csv: $!";
-		
+
 # my $phrases = $summarizer->phrase_list;
 # my @phrase_list = sort { $phrases->{$b} <=> $phrases->{$a} } keys %$phrases;
 # my $highest = $phrase_list[0];
