@@ -6,7 +6,7 @@ Text::Summarizer - Summarize Bodies of Text
 
 	use Text::Summarizer;
 	
-	my $summarizer = Text::Summarizer->new;
+	my $summarizer = Text::Summarizer->new( articles_path => "articles/*" );
 	
 	my $summary   = $summarizer->summarize_file("articles/article00.txt");
 		#or if you want to process in bulk

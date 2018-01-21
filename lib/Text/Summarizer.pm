@@ -71,7 +71,6 @@ has watch_coef => (
 	default => 30,
 );
 
-
 has watch_count => (
 	is => 'rwp',
 	isa => Int,
@@ -79,16 +78,21 @@ has watch_count => (
 );
 
 has watchlist => (
-	is => 'rwp',
+	is => 'lazy',
 	isa => Ref['HASH'],
 	builder => 'load_watchlist',
-	lazy => 1,
 );
 
 has stopwords => (
-	is => 'rwp',
+	is => 'lazy',
 	isa => Ref['HASH'],
 	builder => 'load_stopwords',
+);
+
+has article_length => (
+	is => 'rwp',
+	isa => Int,
+	default => 0,
 	lazy => 1,
 );
 
@@ -147,13 +151,6 @@ has score_hash => (
 	isa => Ref['HASH'],
 );
 
-has article_length => (
-	is => 'rwp',
-	isa => Int,
-	default => 0,
-	lazy => 1,
-)
-
 has return_count => (
 	is => 'rwp',
 	isa => Num,
@@ -203,9 +200,9 @@ sub scan_file {
 	my ($self, $file_path) = @_;
 
 	open( my $file, "<", $file_path )
-		or die "Can't open $filepath: $!";
+		or die "Can't open $file_path: $!";
 
-	say "\nAnalyzing file $filepath";
+	say "\nAnalyzing file $file_path";
 	$self->grow_watchlist( $file );
 	$self->grow_stopwords( $file );
 	$self->store_watchlist;
@@ -216,7 +213,7 @@ sub scan_file {
 }
 
 sub scan_all {
-	my ($self, $dir_path = @_;
+	my ($self, $dir_path) = @_;
 
 	$self->scan_file( $_ ) foreach glob($dir_path // $self->articles_path);
 
@@ -417,7 +414,7 @@ sub analyze_phrases {
 
 		#the following is used for scoring purposes, and is used only to determine the *sigma* score (population standard deviation) of the given *c_word*
 		my $cluster_count = $self->cluster_hash->{$c_word}->[-1]->{cnt};
-		$sigma_hash{$c_word} = int sqrt( ($cluster_countB<2 - ($cluster_count>2 / $cluster_count)) / $cluster_count );	#pop. std. deviation
+		$sigma_hash{$c_word} = int sqrt( ($cluster_count**2 - ($cluster_count**2 / $cluster_count)) / $cluster_count );	#pop. std. deviation
 	}
 
 	$self->_set_sigma_hash( \%sigma_hash );
@@ -626,7 +623,7 @@ Text::Summarizer - Summarize Bodies of Text
 
 	use Text::Summarizer;
 	
-	my $summarizer = Text::Summarizer->new;
+	my $summarizer = Text::Summarizer->new( articles_path => "articles/*" );
 	
 	my $summary   = $summarizer->summarize_file("articles/article00.txt");
 		#or if you want to process in bulk
