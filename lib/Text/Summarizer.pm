@@ -336,12 +336,9 @@ sub tokenize {
 
 	my $full_text = $text;
 		#contains the full body of text
-	my @sentences = split qr/(?|   (?<=(?<!\s[djms]r) (?<!\s[djms]rs) \.  |  \!  |  \?)  \s+\n?
-							   |   \s{3,}
-							   |   \s*\n\s*
+	my @sentences = split qr/(?|   (?<=(?<!\s[djms]r) (?<!\s[djms]rs) \.  |  \!  |  \?)  (?: (?=[A-Z])|\s+)
 							   |   (?: (?<![A-Za-z0-9-]) > \s+)+
 							   |   (?: ^\s+$ )
-							   |   (?: ^$)
 							 )/mix => $full_text;
 		# array of sentences
 
