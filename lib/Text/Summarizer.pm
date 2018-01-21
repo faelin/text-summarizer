@@ -15,7 +15,7 @@ require Exporter;
 @EXPORT = qw();
 @EXPORT_OK = qw();
 %EXPORT_TAGS = (all => [@EXPORT_OK]);
-$VERSION = '1.0203';
+$VERSION = '1.0206';
 
 
 has permanent_path => (
@@ -648,25 +648,20 @@ This module allows you to summarize bodies of text into a scored hash of I<sente
 These scores reflect the weight (or precedence) of the relative text-fragments, i.e. how well they summarize or reflect the overall nature of the text.
 All of the sentences and phrase-fragments are drawn from within the existing text, and are NOT proceedurally generated.
 
-C<$summarizer->summarize_text> and C<$summarizer->summarize_file> each return a hash-ref containing three array-refs (C<$summarizer->summarize_all> returns a list of these hash-refs):
+C<< $summarizer->summarize_text >> and C<< $summarizer->summarize_file >> each return a hash-ref containing three array-refs (C<< $summarizer->summarize_all >> returns a list of these hash-refs):
 
 =over 2
 
 =item B<sentences>
-
 a list of full sentences from the given article, with composite scores of the words contained therein
 
 =item B<fragments>
-
 a list of phrase fragments from the given article, scored as above
 
 =item B<    words>
+a list of all words in the article, scored by a three-factor system consisting of I<frequency of appearance>, I<population standard deviation of word clustering>, and I<use in selected phrase fragments>.
 
-a list of all words in the article, scored by a three-factor system consisting of I<frequency of appearance>, I<population standard deviation of word clustering>, and I<use in important phrase fragments>.
-
-The C<$summarizer->pretty_print> method prints a visually pleasing graph of the above three summary categories.
-
-The C<$summarizer->pretty_print> method prints a visually pleasing graph of the above three summary categories.
+The C<< $summarizer->pretty_print >> method prints a visually pleasing graph of the above three summary categories.
 
 =back
 
@@ -686,7 +681,7 @@ each sentence is tokenized and stored in an array
 
 =item 3
 
-for each word within the C<frequency> table, a table of phrase-fragments is derived by finding each occurance of said word and tracking forward and backward by a user-defined "radius" of tokens (defaults to C<radius = 5>, does not include the central key-word) -- each phrase-fragment is thus compiled of (by default) an 11-token string
+for each word within the C<frequency> table, a table of phrase-fragments is derived by finding each occurance of said word and tracking forward and backward by a user-defined "radius" of tokens (defaults to C<radius = 5>, does not include the central key-word) — each phrase-fragment is thus compiled of (by default) an 11-token string
 
 =item 4
 
@@ -709,7 +704,7 @@ when multiple fragments are equivalent (i.e. they consist of the same list of to
 
 =head1 AUTHOR
 
-Faelin Landy (CPAN:FaeTheWolf) <faelin.landy@gmail.com>
+Faelin Landy (CPAN: FAELIN) L<faelin.landy@gmail.com>
 
 =head1 COPYRIGHT AND LICENSE
 

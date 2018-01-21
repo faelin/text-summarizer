@@ -156,39 +156,34 @@ This module allows you to summarize bodies of text into a scored hash of \fIsent
 These scores reflect the weight (or precedence) of the relative text-fragments, i.e. how well they summarize or reflect the overall nature of the text.
 All of the sentences and phrase-fragments are drawn from within the existing text, and are \s-1NOT\s0 proceedurally generated.
 .PP
-\&\f(CW\*(C`$summarizer\-\*(C'\fRsummarize_text> and \f(CW\*(C`$summarizer\-\*(C'\fRsummarize_file> each return a hash-ref containing three array-refs (\f(CW\*(C`$summarizer\-\*(C'\fRsummarize_all> returns a list of these hash-refs):
-=over 2
-=item *
-\&\fBsentences\fR => a list of full sentences from the given article, with composite scores of the words contained therein
-.IP "\(bu" 4
-\&\fBfragments\fR => a list of phrase fragments from the given article, scored as above
-.IP "\(bu" 4
-\&\fB    words\fR => a list of all words in the article, scored by a three-factor system consisting of \fIfrequency of appearance\fR, \fIpopulation standard deviation of word clustering\fR, and \fIuse in important phrase fragments\fR.
-.Sp
-The \f(CW\*(C`$summarizer\-\*(C'\fRpretty_print> method prints a visually pleasing graph of the above three summary categories.
-.Sp
-The \f(CW\*(C`$summarizer\-\*(C'\fRpretty_print> method prints a visually pleasing graph of the above three summary categories.
-=back
-.Sp
-## About Fragments
+\&\f(CW\*(C`$summarizer\->summarize_text\*(C'\fR and \f(CW\*(C`$summarizer\->summarize_file\*(C'\fR each return a hash-ref containing three array-refs (\f(CW\*(C`$summarizer\->summarize_all\*(C'\fR returns a list of these hash-refs):
+.IP "\fBsentences\fR a list of full sentences from the given article, with composite scores of the words contained therein" 2
+.IX Item "sentences a list of full sentences from the given article, with composite scores of the words contained therein"
+.PD 0
+.IP "\fBfragments\fR a list of phrase fragments from the given article, scored as above" 2
+.IX Item "fragments a list of phrase fragments from the given article, scored as above"
+.IP "\fB    words\fR a list of all words in the article, scored by a three-factor system consisting of \fIfrequency of appearance\fR, \fIpopulation standard deviation of word clustering\fR, and \fIuse in selected phrase fragments\fR." 2
+.IX Item " words a list of all words in the article, scored by a three-factor system consisting of frequency of appearance, population standard deviation of word clustering, and use in selected phrase fragments."
+.PD
+The \f(CW\*(C`$summarizer\->pretty_print\*(C'\fR method prints a visually pleasing graph of the above three summary categories.
+.SS "About Fragments"
+.IX Subsection "About Fragments"
 Phrase fragments are in actuallity short \*(L"scraps\*(R" of text (usually only two or three words) that are derived from the text via the following process:
-=over 8
-=item 1
+.IP "1." 8
 the entirety of the text is tokenized and scored into a \f(CW\*(C`frequency\*(C'\fR table, with a high-pass threshold of frequencies above \f(CW\*(C`# of tokens * user\-defined scaling factor\*(C'\fR
-=item 2
+.IP "2." 8
 each sentence is tokenized and stored in an array
-=item 3
+.IP "3." 8
 for each word within the \f(CW\*(C`frequency\*(C'\fR table, a table of phrase-fragments is derived by finding each occurance of said word and tracking forward and backward by a user-defined \*(L"radius\*(R" of tokens (defaults to \f(CW\*(C`radius = 5\*(C'\fR, does not include the central key-word) X each phrase-fragment is thus compiled of (by default) an 11\-token string
-=item 4
+.IP "4." 8
 all fragments for a given key-word are then compared to each other, and each word is deleted if it appears only once amongst all of the fragments
 (leaving only \f(CW\*(C`\f(CIA\f(CW X \f(CIB\f(CW X ... X \f(CIS\f(CW\*(C'\fR where \fIA\fR, \fIB\fR,...,\fIS\fR are the phrase-fragments)
-=item 5
+.IP "5." 8
 what remains of each fragment is a list of \*(L"scraps\*(R" X strings of consecutive tokens X from which the longest scrap is chosen as a representation of the given phrase-fragment
-=item 6
+.IP "6." 8
 when a shorter fragment-scrap is included in the text of a longer scrap (i.e. a different phrase-fragment), the shorter is deleted and its score is added to the score of the longer
-=item 7
+.IP "7." 8
 when multiple fragments are equivalent (i.e. they consist of the same list of tokens when stopwords are excluded), they are condensed into a single scrap in the form of \f(CW"(some|word|tokens)"\fR such that the fragment now represents the tokens of the scrap (excluding stopwords) regardless of order
-=back
 .SH "AUTHOR"
 .IX Header "AUTHOR"
 Faelin Landy (CPAN:FaeTheWolf) <faelin.landy@gmail.com>
@@ -199,12 +194,3 @@ Copyright (C) 2018 by Faelin Landy
 This program is free software: you can redistribute it and/or modify it under the terms of the \s-1GNU\s0 Lesser General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 .PP
 This program is distributed in the hope that it will be useful, but \s-1WITHOUT ANY WARRANTY\s0; without even the implied warranty of \s-1MERCHANTABILITY\s0 or \s-1FITNESS FOR A PARTICULAR PURPOSE.\s0 See the \s-1GNU\s0 Lesser General Public License for more details.
-.SH "POD ERRORS"
-.IX Header "POD ERRORS"
-Hey! \fBThe above document had some coding errors, which are explained below:\fR
-.IP "Around line 656:" 4
-.IX Item "Around line 656:"
-\&'=item' outside of any '=over'
-.IP "Around line 687:" 4
-.IX Item "Around line 687:"
-You forgot a '=back' before '=head1'
