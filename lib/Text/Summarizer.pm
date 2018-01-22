@@ -15,7 +15,7 @@ require Exporter;
 @EXPORT = qw();
 @EXPORT_OK = qw();
 %EXPORT_TAGS = (all => [@EXPORT_OK]);
-$VERSION = '1.0310';
+$VERSION = '1.0311';
 
 
 has permanent_path => (
@@ -336,7 +336,7 @@ sub tokenize {
 
 	my $full_text = $text;
 		#contains the full body of text
-	my @sentences = split qr/(?|   (?<=(?<!\s[A-Z][a-z]|\s[A-Z][a-z]{2}) \. (?(?=(?<=[A-Z].))(?! \w|\s[a-z])|) | \! | \?) (?:(?=[A-Z])|\s+)
+	my @sentences = split qr/(?|   (?<=(?<!\s[A-Z][a-z]) (?<!\s[A-Z][a-z]{2}) \. (?(?=(?<=[A-Z].))(?! \w|\s[a-z])|) | \! | \?) (?:(?=[A-Z])|\s+)
 							   |   (?: (?<![A-Za-z0-9-]) > \s+)+
 							   |   (?: ^\s+$ )
 							 )/mix => $full_text;
