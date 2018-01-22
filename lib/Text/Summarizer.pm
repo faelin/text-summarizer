@@ -15,7 +15,7 @@ require Exporter;
 @EXPORT = qw();
 @EXPORT_OK = qw();
 %EXPORT_TAGS = (all => [@EXPORT_OK]);
-$VERSION = '1.0206';
+$VERSION = '1.0310';
 
 
 has permanent_path => (
@@ -200,33 +200,6 @@ sub load_stopwords {
 	return \%stopwords;
 }
 
-
-
-#scanning is used to augment the *watchlist* and *stopwords* attributes
-sub scan_file {
-	my ($self, $file_path) = @_;
-
-	open( my $file, "<", $file_path )
-		or die "Can't open $file_path: $!";
-
-	say "\nAnalyzing file $file_path";
-	$self->grow_watchlist( $file );
-	$self->grow_stopwords( $file );
-	$self->store_watchlist;
-	$self->store_stoplist;
-
-	return $self;
-
-}
-
-sub scan_all {
-	my ($self, $dir_path) = @_;
-
-	$self->scan_file( $_ ) foreach glob($dir_path // $self->articles_path);
-
-	return $self;
-}
-
 sub grow_watchlist {
 	my ($self, $file) = @_;
 
@@ -303,6 +276,33 @@ sub store_stoplist {
 
 
 
+#scanning is used to augment the *watchlist* and *stopwords* attributes
+sub scan_file {
+	my ($self, $file_path) = @_;
+
+	open( my $file, "<", $file_path )
+		or die "Can't open $file_path: $!";
+
+	say "\nAnalyzing file $file_path";
+	$self->grow_watchlist( $file );
+	$self->grow_stopwords( $file );
+	$self->store_watchlist;
+	$self->store_stoplist;
+
+	return $self;
+
+}
+
+sub scan_all {
+	my ($self, $dir_path) = @_;
+
+	$self->scan_file( $_ ) foreach glob($dir_path // $self->articles_path);
+
+	return $self;
+}
+
+
+
 sub summarize_text {
 	my ($self, $text) = @_;
 
@@ -336,7 +336,7 @@ sub tokenize {
 
 	my $full_text = $text;
 		#contains the full body of text
-	my @sentences = split qr/(?|   (?<=(?<!\s[djms]r) (?<!\s[djms]rs) \.  |  \!  |  \?)  (?: (?=[A-Z])|\s+)
+	my @sentences = split qr/(?|   (?<=(?<!\s[A-Z][a-z]|\s[A-Z][a-z]{2}) \. (?(?=(?<=[A-Z].))(?! \w|\s[a-z])|) | \! | \?) (?:(?=[A-Z])|\s+)
 							   |   (?: (?<![A-Za-z0-9-]) > \s+)+
 							   |   (?: ^\s+$ )
 							 )/mix => $full_text;
@@ -699,9 +699,16 @@ when multiple fragments are equivalent (i.e. they consist of the same list of to
 
 =back
 
+=head1 SUPPORT
+Bugs should always be submitted via the project hosting bug tracker
+
+https://github.com/faelin/text-summarizer/issues
+
+For other issues, contact the maintainer.
+
 =head1 AUTHOR
 
-Faelin Landy (CPAN: FAELIN) L<faelin.landy@gmail.com>
+Faelin Landy (CPAN: FAELIN) L<faelin.landy@gmail.com> (current maintainer)
 
 =head1 COPYRIGHT AND LICENSE
 

@@ -30,7 +30,7 @@
    "provides" : {
       "Text::Summarizer" : {
          "file" : "lib/Text/Summarizer.pm",
-         "version" : "1.0205"
+         "version" : "1.0310"
       }
    },
    "release_status" : "stable",
@@ -39,9 +39,9 @@
          "http://dev.perl.org/licenses/"
       ],
       "repository" : {
-         "url" : "https://github.com/faelin/text-summarizer/tree/master"
+         "url" : "https://github.com/faelin/text-summarizer/"
       }
    },
-   "version" : "1.0205",
+   "version" : "1.0310",
    "x_serialization_backend" : "JSON::PP version 2.27300"
 }

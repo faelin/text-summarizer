@@ -19,7 +19,7 @@ my $builder = Module::Build->new(
     create_makefile_pl => 'traditional',
     meta_merge     => {
         resources => {
-            repository  => 'https://github.com/faelin/text-summarizer/tree/master'
+            repository  => 'https://github.com/faelin/text-summarizer/'
         },
     },
     configure_requires => { 'Module::Build' => 0.42 }
