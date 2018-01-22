@@ -15,7 +15,7 @@ require Exporter;
 @EXPORT = qw();
 @EXPORT_OK = qw();
 %EXPORT_TAGS = (all => [@EXPORT_OK]);
-$VERSION = '1.0310';
+$VERSION = '1.0312';
 
 
 has permanent_path => (
@@ -336,10 +336,9 @@ sub tokenize {
 
 	my $full_text = $text;
 		#contains the full body of text
-	my @sentences = split qr/(?|   (?<=(?<!\s[A-Z][a-z]|\s[A-Z][a-z]{2}) \. (?(?=(?<=[A-Z].))(?! \w|\s[a-z])|) | \! | \?) (?:(?=[A-Z])|\s+)
-							   |   (?: (?<![A-Za-z0-9-]) > \s+)+
-							   |   (?: ^\s+$ )
-							 )/mix => $full_text;
+	my @sentences = split qr/(?|   (?<=(?<!\s[A-Z][a-z]) (?<!\s[A-Z][a-z]{2}) \. (?(?=(?<=[A-Z].))(?! \w|\s[a-z])|) | \! | \?) (?:(?=[A-Z])|\s+)
+							   |   (?: \n+ | ^\s+ | \s+$ )
+							)/mx => $full_text;
 		# array of sentences
 
 	my @word_list;  # array literal of all the words in the entire text body
@@ -583,7 +582,7 @@ sub pretty_print {
 	say "SUMMARY:";
 	my @sentence_keys = sort { $sentences->{$b} <=> $sentences->{$a} or $a cmp $b} keys %$sentences;
 	for my $sen ( @sentence_keys[0..min($return_count,scalar @sentence_keys - 1)] ) {
-		printf "%4d => %100s\n" => $sentences->{$sen}, $sen;
+		printf "%4d => %s\n" => $sentences->{$sen}, $sen;
 	}
 	say "\n";
 

@@ -15,7 +15,7 @@ name: Text-Summarizer
 provides:
   Text::Summarizer:
     file: lib/Text/Summarizer.pm
-    version: '1.0310'
+    version: '1.0312'
 requires:
   List::AllUtils: '0'
   Moo: '2.003002'
@@ -23,5 +23,5 @@ requires:
 resources:
   license: http://dev.perl.org/licenses/
   repository: https://github.com/faelin/text-summarizer/
-version: '1.0310'
+version: '1.0312'
 x_serialization_backend: 'CPAN::Meta::YAML version 0.018'
