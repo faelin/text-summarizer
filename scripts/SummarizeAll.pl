@@ -30,7 +30,9 @@ my $text_summ = $summarizer->summarize_text(<<'END_SAMPLE');
 END_SAMPLE
 
 
-$summarizer->pretty_print($file_summ, 20);
+#$summarizer->pretty_print($file_summ, 50);
+
+$summarizer->pretty_print($_) for @summaries;
 
 
 # open( my $file, '>>', sprintf( "data/phrases.csv", $i) )

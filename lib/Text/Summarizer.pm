@@ -66,12 +66,6 @@ has phrase_threshold => (
 	default => 2,
 );
 
-has phrase_min => (
-	is => 'ro',
-	isa => Int,
-	default => 2,
-);
-
 has watch_coef => (
 	is => 'ro',
 	isa => Int,
@@ -336,7 +330,7 @@ sub tokenize {
 
 	my $full_text = $text;
 		#contains the full body of text
-	my @sentences = split qr/(?|   (?<=(?<!\s[A-Z][a-z]) (?<!\s[A-Z][a-z]{2}) \. (?(?=(?<=[A-Z].))(?! \w|\s[a-z])|) | \! | \?) (?:(?=[A-Z])|\s+)
+	my @sentences = split qr/(?|   (?<=(?<!\s[A-Z][a-z]) (?<!\s[A-Z][a-z]{2}) \. (?![A-Z]\.|\s[a-z0-9]) | \! | \?) (?:(?=[A-Z])|\s+)
 							   |   (?: \n+ | ^\s+ | \s+$ )
 							)/mx => $full_text;
 		# array of sentences
@@ -577,6 +571,8 @@ sub pretty_print {
 	my ($self, $summary, $return_count) = @_;
 	my ($sentences, $fragments, $words) = @{$summary}{'sentences','fragments','words'};
 
+	$return_count ||= 20;
+
 	binmode STDOUT, ":utf8";
 
 	say "SUMMARY:";
@@ -635,7 +631,7 @@ Text::Summarizer - Summarize Bodies of Text
 		#or if you want to process in bulk
 	my @summaries = $summarizer->summarize_all("articles/*");
 	
-	$summarizer->pretty_print($summary);
+	$summarizer->pretty_print($summary, 50);
 	$summarizer->pretty_print($_) for (@summaries);
 
 =head1 DESCRIPTION
@@ -699,6 +695,7 @@ when multiple fragments are equivalent (i.e. they consist of the same list of to
 =back
 
 =head1 SUPPORT
+
 Bugs should always be submitted via the project hosting bug tracker
 
 https://github.com/faelin/text-summarizer/issues
