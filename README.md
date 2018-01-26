@@ -12,7 +12,7 @@ Text::Summarizer - Summarize Bodies of Text
 		#or if you want to process in bulk
 	my @summaries = $summarizer->summarize_all("articles/*");
 	
-	$summarizer->pretty_print($summary);
+	$summarizer->pretty_print($summary, 50);
 	$summarizer->pretty_print($_) for (@summaries);
 
 # DESCRIPTION
@@ -39,9 +39,17 @@ Phrase fragments are in actuallity short "scraps" of text (usually only two or t
 6. when a shorter fragment-scrap is included in the text of a longer scrap (i.e. a different phrase-fragment), the shorter is deleted and its score is added to the score of the longer
 7. when multiple fragments are equivalent (i.e. they consist of the same list of tokens when stopwords are excluded), they are condensed into a single scrap in the form of `"(some|word|tokens)"` such that the fragment now represents the tokens of the scrap (excluding stopwords) regardless of order
 
+# SUPPORT
+
+Bugs should always be submitted via the project hosting bug tracker
+
+https://github.com/faelin/text-summarizer/issues
+
+For other issues, contact the maintainer.
+
 # AUTHOR
 
-Faelin Landy (CPAN:FaeTheWolf) <faelin.landy@gmail.com>
+Faelin Landy (CPAN:FaeTheWolf) <faelin.landy@gmail.com> (current maintainer)
 
 # COPYRIGHT AND LICENSE
 
