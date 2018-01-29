@@ -73,8 +73,6 @@ subtest '$text_summ Structure Intact' => sub {
 		 ok all_u( sub { $_ > 0 } => values %{$text_summ->{fragments}} ), 'all fragments scored';
 		 ok all_u( sub { $_ > 0 } => values %{$text_summ->{  words  }} ), 'all words are scored';
 
-	binmode STDOUT, ":utf8";
-
 		 ok all_u( sub { /(?<!\s[A-Z][a-z]) (?<!\s[A-Z][a-z]{2}) \. (?![A-Z]\.|\s[a-z0-9]) | \! | \? | \b$/x } => keys %{$text_summ->{sentences}} ), 'sentences look sentency';
 		 ok all_u( sub { /(?: \( [\w'’-]+ (?: \| [\w'’-]+ )*  \) ) | (?: [\w'’-]+ (?: \s [\w'’-]+ )* )/x } => keys %{$text_summ->{fragments}} ), 'fragments look fragmenty';
 		 ok all_u( sub { /[\w'’-]+/x } => keys %{$text_summ->{  words  }} ), 'all words look like words';

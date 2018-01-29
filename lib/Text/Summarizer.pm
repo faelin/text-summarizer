@@ -5,7 +5,7 @@ use strict;
 use warnings;
 use Moo;
 use Types::Standard qw/ Ref Str Int Num InstanceOf /;
-use List::AllUtils qw/ max min sum singleton /;
+use List::AllUtils qw/ max min sum sum0 singleton /;
 use utf8;
 
 use vars qw(@ISA @EXPORT @EXPORT_OK %EXPORT_TAGS $VERSION);
@@ -15,7 +15,7 @@ require Exporter;
 @EXPORT = qw();
 @EXPORT_OK = qw();
 %EXPORT_TAGS = (all => [@EXPORT_OK]);
-$VERSION = '1.0312';
+$VERSION = '1.041';
 
 
 has permanent_path => (
@@ -78,16 +78,14 @@ has watch_count => (
 	default => 0,
 );
 
-has watchlist => (
-	is => 'lazy',
+has add_words => (
+	is => 'rwp',
 	isa => Ref['HASH'],
-	builder => 'load_watchlist',
 );
 
 has stopwords => (
 	is => 'lazy',
 	isa => Ref['HASH'],
-	builder => 'load_stopwords',
 );
 
 has article_length => (
@@ -160,24 +158,7 @@ has return_count => (
 
 
 
-sub load_watchlist {
-	my $self = shift;
-	my %watch_list;
-
-	open( my $watchlist_file, '<', $self->watchlist_path )
-		or die "Can't open " . $self->watchlist_path . ": $!";
-
-	for (<$watchlist_file>) {
-		$watch_list{$1} = $2 if m/\s*(\w+) \| \s*(\d+)/;
-	}
-	close $watchlist_file;
-
-	$self->_set_watch_count( sum values %{$self->watchlist} // 0 );  #counts the total number of watch_words ever collected
-
-	return \%watch_list;
-}
-
-sub load_stopwords {
+sub _build_stopwords {
 	my $self = shift;
 	my %stopwords;
 
@@ -194,73 +175,10 @@ sub load_stopwords {
 	return \%stopwords;
 }
 
-sub grow_watchlist {
-	my ($self, $file) = @_;
-
-	for (<$file>) {
-		for my $word ( map { /\b (?: \w \. (?: ['’-] \w+ )?)+ | (?: \w+ ['’-]? )+ (?=\s|\b)/gx } lc $_ ) {
-			$self->watchlist->{$word}++ unless ( exists $self->stopwords->{$word} );
-		}
-	}
-
-	$self->_set_watch_count( sum values %{$self->watchlist} // 0 );  #counts the total number of watch_words ever collected
-
-	return $self;
-}
-
-sub grow_stopwords {
-	my ( $self, $file ) = @_;
-	my ( $watch_factor, $watch_length, $avgfreq );
-
-	$watch_length = scalar keys %{$self->watchlist}; #total number of words in the WATCH_LIST
-	$avgfreq = $watch_length ? $self->watch_count / $watch_length : 0; #average frequency of words in WATCH_LIST
-
-	my ($low, $lower, $upper, $high) = ($avgfreq, 0, 0, $avgfreq);
-	for my $score (values %{$self->watchlist}) {
-		$score > $avgfreq ? $upper += $score : $lower += $score;
-		$high = max( $score => $high );
-		$low  = min( $score => $low  );
-	}
-
-	my $normal    = ($watch_length / 2);  #normalization scalar
-	my $whisker   = (3 * $upper - $lower) / (2 * $normal);  #upper whisker
-	$watch_factor = $whisker * ($self->watch_coef / log $self->watch_count);  #low-pass threshold
-
-	for (keys %{$self->watchlist}) {
-		$self->stopwords->{$_} = 1 if $self->watchlist->{$_} > $watch_factor;
-	}
-
-
-	$upper /=  $normal;
-	$lower /=  $normal;
-	say "lower = $lower; mid = $avgfreq; upper = $upper";
-	say "upper whisker = $whisker";
-	say "avg freq = $avgfreq";
-	say "factor = $watch_factor";
-}
-
-sub store_watchlist {
+sub _store_stopwords {
 	my $self = shift;
 
-	my @printlist = sort { $self->watchlist->{$b} <=> $self->watchlist->{$a} } keys %{$self->watchlist};
-
-	my $max_word_length = max map { length } keys %{$self->watchlist};  #generates the length of the longest word collected
-	my $max_score_length = max map { length } values %{$self->watchlist};  #generates the length of the longest score collected
-
-	my $format = "\%" . $max_word_length . "s | \%" . $max_score_length . "s\n";
-
-	open( my $watchlist_file, ">", $self->watchlist_path )
-		or die "Can't open $self->watchlist_path: $!";
-	printf $watchlist_file $format x @printlist, map { ($_ => $self->watchlist->{$_}) } @printlist;
-	close $watchlist_file;
-
-	return $self;
-}
-
-sub store_stoplist {
-	my $self = shift;
-
-	open( my $stopwords_file, ">", $self->stopwords_path)
+	open( my $stopwords_file, ">>", $self->stopwords_path)
 		or die "Can't open $self->stopwords_file: $!";
 	print $stopwords_file "$_\n" for sort keys %{$self->stopwords};
 	close $stopwords_file;
@@ -270,29 +188,31 @@ sub store_stoplist {
 
 
 
-#scanning is used to augment the *watchlist* and *stopwords* attributes
+sub scan_text {
+	my ($self, $text) = @_;
+
+	$self->tokenize( $text );	#breaks the provided file into sentences and individual words
+	$self->develop_stopwords;	#analyzes the frequency and clustering of words within the provided file
+	$self->_store_stopwords;
+
+	return $self->add_words;
+}
+
 sub scan_file {
 	my ($self, $file_path) = @_;
 
-	open( my $file, "<", $file_path )
+	open( my $file, '<:utf8', $file_path )
 		or die "Can't open $file_path: $!";
 
-	say "\nAnalyzing file $file_path";
-	$self->grow_watchlist( $file );
-	$self->grow_stopwords( $file );
-	$self->store_watchlist;
-	$self->store_stoplist;
+	my $text = join "\n" => map { $_ } <$file>;
 
-	return $self;
-
+	return $self->scan_text($text);
 }
 
 sub scan_all {
 	my ($self, $dir_path) = @_;
 
-	$self->scan_file( $_ ) foreach glob($dir_path // $self->articles_path);
-
-	return $self;
+	return map { $self->scan_file( $_ ) } glob($dir_path // $self->articles_path);
 }
 
 
@@ -300,7 +220,7 @@ sub scan_all {
 sub summarize_text {
 	my ($self, $text) = @_;
 
-	$self->tokenize( $text );	#breaks the provided file into sentences and individual words
+	$self->tokenize($text);		#breaks the provided file into sentences and individual words
 	$self->analyze_phrases;		#analyzes the frequency and clustering of words within the provided file
 
 	return $self->summary;
@@ -357,7 +277,7 @@ sub tokenize {
 
 
 
-sub analyze_phrases {
+sub develop_stopwords {
 	my $self = shift;
 
 
@@ -372,14 +292,17 @@ sub analyze_phrases {
 
 
 	my (%cluster_hash, %cluster_count);
+	my $abs_pos = 0;
 	for my $sen_index (0..scalar @{$self->sentences} - 1) { #gives the index of each sentence in the article
 		my @sen_words = @{$self->sen_words->[$sen_index]}; 
 						# creates an array of each word in the given sentence,
 						# given that the word is not a stopword and is longer than the given *word_length_threshold*
 		
 		for my $position (0..scalar @sen_words - 1) { #iterates across each word in the sentence
+			$abs_pos++;
+
 			if ( exists $self->freq_hash->{$sen_words[$position]}) { ## true if the given word at index *position* appears in the *freq_hash*
-				my %word = ( sen => $sen_index, pos => $position, cnt => ++$cluster_count{$sen_words[$position]} );
+				my %word = ( abs => $abs_pos, sen => $sen_index, pos => $position, cnt => ++$cluster_count{$sen_words[$position]} );
 					# hash-vector of three elements:
 					#	sen => the index of the current sentence
 					#	pos => index of the current word within the current sentence
@@ -392,7 +315,7 @@ sub analyze_phrases {
 
 
 	#create long-form phrases around frequently used words by tracking forward and backward *phrase_radius* from any given *c_word*
-	my (%phrase_hash, %sigma_hash);
+	my (%phrase_hash, %sigma_hash, %dist_list);
 	for my $c_word (keys %{$self->cluster_hash}) {
 		for my $c_vector (@{$self->cluster_hash->{$c_word}}) {
 
@@ -409,9 +332,310 @@ sub analyze_phrases {
 				#the *phrase_hash* can only contain a given *phrase* array if it is longer than the defined *phrase_threshold* + 1  (defaults to 3)
 		}
 
+		#create a list of the distances between each instance of the current *c_word*
+		my ($L_pos, $R_pos);
+		for (my $i = 0; $i < scalar @{$self->cluster_hash->{$c_word}}; $i++) {
+			$R_pos = $self->cluster_hash->{$c_word}->[$i]->{abs};
+
+			my $dist = $R_pos - ($L_pos // $R_pos);
+			push @{$dist_list{$c_word}} => $dist if $dist >= 0;
+
+			$L_pos = $R_pos;
+		}
+
+
 		#the following is used for scoring purposes, and is used only to determine the *sigma* score (population standard deviation) of the given *c_word*
-		my $cluster_count = $self->cluster_hash->{$c_word}->[-1]->{cnt};
-		$sigma_hash{$c_word} = int sqrt( ($cluster_count**2 - ($cluster_count**2 / $cluster_count)) / $cluster_count );	#pop. std. deviation
+		my $pop_size = scalar @{$dist_list{$c_word}} or 1;
+		my $pop_ave  = sum0( @{$dist_list{$c_word}} ) / $pop_size;
+		$sigma_hash{$c_word} = int sqrt( sum( map { ($_ - $pop_ave)**2 } @{$dist_list{$c_word}} ) / $pop_size );	#pop. std. deviation
+	}
+
+	$self->_set_sigma_hash( \%sigma_hash );
+	$self->_set_phrase_hash( \%phrase_hash );
+
+
+	#find common phrase-fragments
+	my (%inter_hash, %score_hash, %bare_phrase, %full_phrase); #*inter_hash* contains phrase fragments;  *score_hash* contains score values for words in those phrases
+	F_WORD: for my $f_word (keys %{$self->phrase_hash}) {
+
+
+		my (@hash_list, %sum_list); #*hash_list* contains ordered, formatted lists of each word in the phrase fragment;  *sum_list* contains the total number of times each word appears in all phrases for the given *f_word*
+		ORDER: for my $phrase (@{$self->phrase_hash->{$f_word}}) {
+			my %ordered_words = map { $sum_list{$phrase->[$_]}++; ($_ => $phrase->[$_]) } (1..scalar @{$phrase} - 1);
+				# *words* contains an ordered, formatted list of each word in the given phrase fragment, looks like:
+				# 	'01' => 'some'
+				#	'02' => 'word'
+				#	'03' => 'goes'
+				# 	'04' => 'here'
+			my %full_phrase = %ordered_words;
+			push @hash_list => [$f_word, \%full_phrase, \%ordered_words];
+		}
+
+
+		#removes each word from the *word_hash* unless it occurs more than once amongst all phrases
+		SCRAP: for my $word_hash (@hash_list) {
+			for my $word (keys %{$word_hash->[-1]}) {
+				delete $word_hash->[-1]->{$word} unless $sum_list{$word_hash->[-1]->{$word}} > 1
+			}
+		}
+
+
+		#break phrases fragments into "scraps" (consecutive runs of words within the fragment)
+		my @frag_list;
+		 FRAG: for my $word_hash (@hash_list) {
+			my (%L_scrap, %R_scrap); #a "scrap" is a sub-fragment
+			my ($prev, $curr, $next) = (-1,0,0); #used to find consecutive sequences of words
+			my $real = 0; #flag for stopwords identification
+
+			my @word_keys = sort { $a <=> $b } keys %{$word_hash->[-1]}; # *word_keys* contains a series of index-values
+			for (my $i = 0; $i < scalar @word_keys; $i++ ) {
+				$curr = $word_keys[$i];
+				$next = $word_keys[$i+1] if $i < scalar @word_keys - 1; # if-statement prevents out-of-bounds error
+
+				if ( $next == $curr + 1 or $curr == $prev + 1 ) {
+					unless ($curr == $prev + 1) {  #resets *R_scrap* when the *curr* index skips over a number (i.e. a new scrap is encountered)
+						%L_scrap = %R_scrap if keys %L_scrap <= keys %R_scrap; #chooses the longest or most recent scrap
+						%R_scrap = (); #resets the *R_scrap*
+					}
+					$R_scrap{$curr} = $word_hash->[-1]->{$curr};
+					$real = 1 unless $self->stopwords->{$R_scrap{$curr}}; #ensures that scraps consisting only of stopwords are ignored
+				} else {
+					%L_scrap = %R_scrap if keys %L_scrap <= keys %R_scrap; #chooses the longest or most recent scrap
+					%R_scrap = (); #resets the *R_scrap*
+				}
+				$prev = $curr;
+			}
+			%L_scrap = %R_scrap if keys %L_scrap <= keys %R_scrap; #chooses the longest or most recent scrap
+			%R_scrap = (); #resets the *R_scrap*
+			push @frag_list => [$word_hash->[0], $word_hash->[1], $word_hash->[2], \%L_scrap] if $real and scalar keys %L_scrap >= $self->phrase_threshold;
+		}
+
+
+		#compile scraps for scoring
+		 JOIN: for my $fragment (@frag_list) {
+			my $scrap  = join ' ' => map { $score_hash{$_}++;
+											$fragment->[-1]->{$_} } sort { $a <=> $b } keys %{$fragment->[-1]};
+			$score_hash{$f_word}++;  #scores each *f_word*
+
+			for my $word (split ' ' => $scrap) {
+				$score_hash{$word} += $freq_hash{$word}  // 0;
+				$score_hash{$word} += $sigma_hash{$word} // 0;
+			}
+		}
+
+		grep { delete $score_hash{$_} if $self->stopwords->{$_} } keys %score_hash;
+	}
+
+
+	use Algorithm::CurveFit;
+
+
+	my @word_keys = sort { $score_hash{$b} <=> $score_hash{$a} or $a cmp $b } keys %score_hash;
+	my $highest = $score_hash{$word_keys[0]};
+
+	@word_keys = grep { int(40 * $score_hash{$_} / $highest) > 0 } @word_keys;
+
+	my $n = scalar @word_keys;
+	my $longest = max map {length} @word_keys;
+	my $average = sum map { $score_hash{$_} } @word_keys / $n;
+
+	my $variable = 'x';
+	my ($a, $b, $c, $d, $e, $f);
+	my @xdata = 1..$n; # The data corresponsing to $variable
+	my @ydata = reverse map { $score_hash{$_} } @word_keys; # The data on the other axis
+	my @params_poly = (
+	    # Name    Guess      Accuracy
+	    ['a',    $highest,    0.00001],
+	    ['b',    $average,    0.00001],
+	    ['c',       0,        0.00001],
+	);
+	my $max_iter = 100; # maximum iterations
+	my $square_residual = Algorithm::CurveFit->curve_fit(
+	    formula            => 'c + b * x + a * x^2',
+	    params             => \@params_poly,
+	    variable           => $variable,
+	    xdata              => \@xdata,
+	    ydata              => \@ydata,
+	    maximum_iterations => $max_iter,
+	);
+	($a, $b, $c) = ($params_poly[0]->[1],$params_poly[1]->[1],$params_poly[2]->[1]);
+
+	my $numer_poly = ($n * sum map { $_ * ($a * $_ ** 2 + $b * $_ + $c) } 1..$n) - (sum 1..$n) * (sum map { ($a * $_ ** 2 + $b * $_ + $c) } 1..$n);
+	my $denom_poly = sqrt(  ($n * (sum map { $_ ** 2 } 1..$n) - ((sum 1..$n) ** 2))*($n * (sum map { ($a * $_ ** 2 + $b * $_ + $c)**2 } 1..$n) - (sum map { ($a * $_ ** 2 + $b * $_ + $c) } 1..$n)**2)  );
+
+	my $r2_poly = ($numer_poly / $denom_poly) ** 2;
+
+
+
+	my @params_expo = (
+	    # Name    Guess      Accuracy
+	    ['d',    $highest,   0.00001],
+	);
+	$square_residual = Algorithm::CurveFit->curve_fit(
+	    formula            => 'd * 2.71828^x',
+	    params             => \@params_expo,
+	    variable           => $variable,
+	    xdata              => \@xdata,
+	    ydata              => \@ydata,
+	    maximum_iterations => $max_iter,
+	);
+	($d) = ($params_expo[0]->[1],);
+
+	my $numer_expo = ($n * sum map { $_ * ($d * exp($_)) } 1..$n) - (sum 1..$n) * (sum map { ($d * exp($_)) } 1..$n);
+	my $denom_expo = sqrt(  ($n * (sum map { $_ ** 2 } 1..$n) - ((sum 1..$n) ** 2))*($n * (sum map { ($d * exp($_))**2 } 1..$n) - (sum map { ($d * exp($_)) } 1..$n)**2)  );
+
+	my $r2_expo = ($numer_expo / $denom_expo) ** 2;
+
+
+
+	my @params_line = (
+	    # Name    Guess      Accuracy
+	    ['e',    $average,   0.00001],
+	    ['f',       0,       0.00001],
+	);
+	$square_residual = Algorithm::CurveFit->curve_fit(
+	    formula            => 'e * x + f',
+	    params             => \@params_line,
+	    variable           => $variable,
+	    xdata              => \@xdata,
+	    ydata              => \@ydata,
+	    maximum_iterations => $max_iter,
+	);
+	($e, $f) = ($params_line[0]->[1],$params_line[1]->[1],);
+
+	my $numer_line = sum(  map { ($score_hash{$word_keys[$_-1]} - ($e * $_ + $f)) ** 2 } 1..$n  );
+	my $denom_line = sum(  map { ($score_hash{$word_keys[$_-1]} - $average) ** 2 } 1..$n  );
+
+	my $r2_line = 1 - ($numer_line / $denom_line - 1);
+
+
+
+	print "POLY: $r2_poly\n";
+	print "EXPO: $r2_expo\n";
+	print "LINE: $r2_line\n";
+
+	binmode STDOUT, ":utf8";
+
+	print "KNOWN:\n";
+	KEY: for my $index ( 0..scalar @word_keys - 1 ) {
+	my $format = "%" . $longest . "s|%s\n";
+	my $score = int (40 * $score_hash{$word_keys[$index]} / $highest);
+	printf $format => ( $word_keys[$index] , '-' x max($score, 0) );
+	}
+	say "\n";
+
+	@word_keys = reverse @word_keys;
+
+
+	if ($r2_poly > $r2_expo and $r2_poly > $r2_line) {
+		$highest = $a * $n ** 2 + $b * $n + $c;
+		print "CALCULATED (poly)\n";
+		KEY: for my $index ( reverse 1..scalar @word_keys ) {
+			my $format = "%" . $longest . "s|%s\n";
+			my $raw    = $a * $index ** 2 + $b * $index + $c;
+			my $score  = int (40 * $raw / $highest);
+			printf $format => ( $word_keys[$index - 1] , '-' x max($score, 0) );
+		}
+		print "\n\n\n";
+	} elsif ($r2_expo > $r2_poly and $r2_expo > $r2_line) {
+		$highest = $d * exp($n);
+		print "CALCULATED (expo)\n";
+		KEY: for my $index ( reverse 1..scalar @word_keys ) {
+			my $format = "%" . $longest . "s|%s\n";
+			my $raw    = $d * exp($index);
+			my $score  = int (40 * $raw / $highest);
+			printf $format => ( $word_keys[$index - 1] , '-' x max($score, 0) );
+		}
+		print "\n\n\n";
+	} else {
+		$highest = $e * $n + $f;
+		print "CALCULATED (line)\n";
+		KEY: for my $index ( reverse 1..scalar @word_keys ) {
+			my $format = "%" . $longest . "s|%s\n";
+			my $raw    = $e * $index + $f;
+			my $score  = int (40 * $raw / $highest);
+			printf $format => ( $word_keys[$index - 1] , '-' x max($score, 0) );
+		}
+		print "\n\n\n";
+	}
+
+
+	return $self;
+}
+
+
+
+sub analyze_phrases {
+	my $self = shift;
+
+
+	my $min_freq_thresh = int($self->article_length * $self->freq_constant) // 1; #estimates a minimum threshold of occurence for frequently occuring words
+	my %freq_hash; #counts the number of times each word appears in the *%word_list* hash
+	for my $word (@{$self->word_list}) {
+	 	$freq_hash{$word}++ unless $self->stopwords->{$word};
+	}
+	grep { delete $freq_hash{$_} if $freq_hash{$_} < $min_freq_thresh } keys %freq_hash;
+		#remove words that appear less than the *$min_freq_thresh* (defaults to 1)
+	$self->_set_freq_hash( \%freq_hash );
+
+
+	my (%cluster_hash, %cluster_count);
+	my $abs_pos = 0;
+	for my $sen_index (0..scalar @{$self->sentences} - 1) { #gives the index of each sentence in the article
+		my @sen_words = @{$self->sen_words->[$sen_index]}; 
+						# creates an array of each word in the given sentence,
+						# given that the word is not a stopword and is longer than the given *word_length_threshold*
+		
+		for my $position (0..scalar @sen_words - 1) { #iterates across each word in the sentence
+			$abs_pos++;
+
+			if ( exists $self->freq_hash->{$sen_words[$position]}) { ## true if the given word at index *position* appears in the *freq_hash*
+				my %word = ( abs => $abs_pos, sen => $sen_index, pos => $position, cnt => ++$cluster_count{$sen_words[$position]} );
+					# hash-vector of three elements:
+					#	sen => the index of the current sentence
+					#	pos => index of the current word within the current sentence
+					#	cnt => number of times the given word has appeared in the entire text file
+				push @{$cluster_hash{$sen_words[$position]}} => \%word;
+			}
+		}
+	}
+	$self->_set_cluster_hash( \%cluster_hash );
+
+
+	#create long-form phrases around frequently used words by tracking forward and backward *phrase_radius* from any given *c_word*
+	my (%phrase_hash, %sigma_hash, %dist_list);
+	for my $c_word (keys %{$self->cluster_hash}) {
+		for my $c_vector (@{$self->cluster_hash->{$c_word}}) {
+
+			my ($sen, $pos, $cnt) = @$c_vector{'sen', 'pos', 'cnt'};
+			# *sen* indicates which sentence the current *c_word* appears in
+			# *pos* indicates the position of the *c_word* within the sentence (see above)
+			# *cnt* counts the total number of times the word has been detected thus far
+
+			my @phrase = @{$self->sen_words->[$sen]}[ max($pos - $self->phrase_radius, 0) .. min($pos + $self->phrase_radius, scalar(@{$self->sen_words->[$sen]}) - 1) ];
+				#array slice containing only tokens within *phrase_radius* of the *c_word* within the given sentence
+
+			unshift @phrase => $self->sentences->[$sen]; #begins the *phrase* array with a complete, unedited sentence (for reference only)
+			push @{$phrase_hash{$c_word}} => \@phrase if scalar @phrase > $self->phrase_threshold + 1;
+				#the *phrase_hash* can only contain a given *phrase* array if it is longer than the defined *phrase_threshold* + 1  (defaults to 3)
+		}
+
+		#create a list of the distances between each instance of the current *c_word*
+		my ($L_pos, $R_pos);
+		for (my $i = 0; $i < scalar @{$self->cluster_hash->{$c_word}}; $i++) {
+			$R_pos = $self->cluster_hash->{$c_word}->[$i]->{abs};
+
+			my $dist = $R_pos - ($L_pos // $R_pos);
+			push @{$dist_list{$c_word}} => $dist if $dist >= 0;
+
+			$L_pos = $R_pos;
+		}
+
+
+		#the following is used for scoring purposes, and is used only to determine the *sigma* score (population standard deviation) of the given *c_word*
+		my $pop_size = scalar @{$dist_list{$c_word}} or 1;
+		my $pop_ave  = sum0( @{$dist_list{$c_word}} ) / $pop_size;
+		$sigma_hash{$c_word} = int sqrt( sum( map { ($_ - $pop_ave)**2 } @{$dist_list{$c_word}} ) / $pop_size );	#pop. std. deviation
 	}
 
 	$self->_set_sigma_hash( \%sigma_hash );

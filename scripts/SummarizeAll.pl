@@ -4,9 +4,10 @@ use Text::Summarizer;
 
 my $summarizer = Text::Summarizer->new(articles_path => "articles/*");
 
-# $summarizer->scan_all;
+my $new_words = $summarizer->scan_all();
+
 my @summaries = $summarizer->summarize_all();
-my $file_summ = $summarizer->summarize_file("articles/article00.txt");
+my $file_summ = $summarizer->summarize_file("articles/17900108-Washington.txt");
 my $text_summ = $summarizer->summarize_text(<<'END_SAMPLE');
 
 	YOU don’t know about me without you have read a book by the name of The Adventures of Tom Sawyer; 
@@ -32,7 +33,7 @@ END_SAMPLE
 
 #$summarizer->pretty_print($file_summ, 50);
 
-$summarizer->pretty_print($_) for @summaries;
+#$summarizer->pretty_print($_) for @summaries;
 
 
 # open( my $file, '>>', sprintf( "data/phrases.csv", $i) )
