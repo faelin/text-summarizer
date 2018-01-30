@@ -30,7 +30,7 @@
    "provides" : {
       "Text::Summarizer" : {
          "file" : "lib/Text/Summarizer.pm",
-         "version" : "1.0312"
+         "version" : "1.041"
       }
    },
    "release_status" : "stable",
@@ -42,6 +42,6 @@
          "url" : "https://github.com/faelin/text-summarizer/"
       }
    },
-   "version" : "1.0312",
+   "version" : "1.041",
    "x_serialization_backend" : "JSON::PP version 2.27300"
 }

@@ -129,7 +129,7 @@
 .\" ========================================================================
 .\"
 .IX Title "Text::Summarizer 3"
-.TH Text::Summarizer 3 "2018-01-22" "perl v5.24.0" "User Contributed Perl Documentation"
+.TH Text::Summarizer 3 "2018-01-28" "perl v5.24.0" "User Contributed Perl Documentation"
 .\" For nroff, turn off justification.  Always turn off hyphenation; it makes
 .\" way too many mistakes in technical documents.
 .if n .ad l
@@ -147,7 +147,7 @@ Text::Summarizer \- Summarize Bodies of Text
 \&                #or if you want to process in bulk
 \&        my @summaries = $summarizer\->summarize_all("articles/*");
 \&        
-\&        $summarizer\->pretty_print($summary);
+\&        $summarizer\->pretty_print($summary, 50);
 \&        $summarizer\->pretty_print($_) for (@summaries);
 .Ve
 .SH "DESCRIPTION"
@@ -184,8 +184,10 @@ what remains of each fragment is a list of \*(L"scraps\*(R" X strings of consecu
 when a shorter fragment-scrap is included in the text of a longer scrap (i.e. a different phrase-fragment), the shorter is deleted and its score is added to the score of the longer
 .IP "7." 8
 when multiple fragments are equivalent (i.e. they consist of the same list of tokens when stopwords are excluded), they are condensed into a single scrap in the form of \f(CW"(some|word|tokens)"\fR such that the fragment now represents the tokens of the scrap (excluding stopwords) regardless of order
-.SH "SUPPORT Bugs should always be submitted via the project hosting bug tracker"
-.IX Header "SUPPORT Bugs should always be submitted via the project hosting bug tracker"
+.SH "SUPPORT"
+.IX Header "SUPPORT"
+Bugs should always be submitted via the project hosting bug tracker
+.PP
 https://github.com/faelin/text\-summarizer/issues
 .PP
 For other issues, contact the maintainer.

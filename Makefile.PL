@@ -2,15 +2,15 @@
 use ExtUtils::MakeMaker;
 WriteMakefile
 (
-  'PREREQ_PM' => {
-                   'List::AllUtils' => 0,
-                   'Types::Standard' => 0,
-                   'Moo' => '2.003002'
-                 },
-  'NAME' => 'Text::Summarizer',
-  'INSTALLDIRS' => 'site',
   'PL_FILES' => {},
   'VERSION_FROM' => 'lib/Text/Summarizer.pm',
-  'EXE_FILES' => []
+  'INSTALLDIRS' => 'site',
+  'PREREQ_PM' => {
+                   'Moo' => '2.003002',
+                   'List::AllUtils' => 0,
+                   'Types::Standard' => 0
+                 },
+  'EXE_FILES' => [],
+  'NAME' => 'Text::Summarizer'
 )
 ;

@@ -1,3 +1,4 @@
+articles/17900108-Washington.txt
 Build.PL
 data/permanent.stop
 data/stopwords.stop
@@ -10,3 +11,4 @@ META.json
 META.yml
 README.md
 scripts/SummarizeAll.pl
+t/infrastructure_test.t

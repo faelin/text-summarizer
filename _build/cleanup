@@ -9,6 +9,8 @@ do{ my $x = {
        'Text-Summarizer-1.0310' => 1,
        'Text-Summarizer-1.0311' => 1,
        'Text-Summarizer-1.0312' => 1,
+       'Text-Summarizer-1.04' => 1,
+       'Text-Summarizer-1.041' => 1,
        'Text::Summarizer-*' => 1,
        'blib' => 1
      };

@@ -6,7 +6,10 @@ use warnings;
 use Moo;
 use Types::Standard qw/ Ref Str Int Num InstanceOf /;
 use List::AllUtils qw/ max min sum sum0 singleton /;
+use Algorithm::CurveFit;
 use utf8;
+
+binmode STDOUT, ":utf8";
 
 use vars qw(@ISA @EXPORT @EXPORT_OK %EXPORT_TAGS $VERSION);
 require Exporter;
@@ -15,7 +18,7 @@ require Exporter;
 @EXPORT = qw();
 @EXPORT_OK = qw();
 %EXPORT_TAGS = (all => [@EXPORT_OK]);
-$VERSION = '1.041';
+$VERSION = '1.050';
 
 
 has permanent_path => (
@@ -427,138 +430,190 @@ sub develop_stopwords {
 	}
 
 
-	use Algorithm::CurveFit;
-
 
 	my @word_keys = sort { $score_hash{$b} <=> $score_hash{$a} or $a cmp $b } keys %score_hash;
 	my $highest = $score_hash{$word_keys[0]};
-
-	@word_keys = grep { int(40 * $score_hash{$_} / $highest) > 0 } @word_keys;
-
-	my $n = scalar @word_keys;
 	my $longest = max map {length} @word_keys;
-	my $average = sum map { $score_hash{$_} } @word_keys / $n;
 
-	my $variable = 'x';
-	my ($a, $b, $c, $d, $e, $f);
-	my @xdata = 1..$n; # The data corresponsing to $variable
-	my @ydata = reverse map { $score_hash{$_} } @word_keys; # The data on the other axis
-	my @params_poly = (
-	    # Name    Guess      Accuracy
-	    ['a',    $highest,    0.00001],
-	    ['b',    $average,    0.00001],
-	    ['c',       0,        0.00001],
-	);
-	my $max_iter = 100; # maximum iterations
-	my $square_residual = Algorithm::CurveFit->curve_fit(
-	    formula            => 'c + b * x + a * x^2',
-	    params             => \@params_poly,
-	    variable           => $variable,
-	    xdata              => \@xdata,
-	    ydata              => \@ydata,
-	    maximum_iterations => $max_iter,
-	);
-	($a, $b, $c) = ($params_poly[0]->[1],$params_poly[1]->[1],$params_poly[2]->[1]);
+	$score_hash{$_} = 40 * $score_hash{$_} / $highest for keys %score_hash;
 
-	my $numer_poly = ($n * sum map { $_ * ($a * $_ ** 2 + $b * $_ + $c) } 1..$n) - (sum 1..$n) * (sum map { ($a * $_ ** 2 + $b * $_ + $c) } 1..$n);
-	my $denom_poly = sqrt(  ($n * (sum map { $_ ** 2 } 1..$n) - ((sum 1..$n) ** 2))*($n * (sum map { ($a * $_ ** 2 + $b * $_ + $c)**2 } 1..$n) - (sum map { ($a * $_ ** 2 + $b * $_ + $c) } 1..$n)**2)  );
+	@word_keys = grep { $score_hash{$_} >= 1 } @word_keys;
 
-	my $r2_poly = ($numer_poly / $denom_poly) ** 2;
+
+	my $score_ave = sum( map { $score_hash{$_} } @word_keys ) / scalar @word_keys;
+
+	my ($low, $lower, $upper, $high) = ($score_ave, 0, 0, $score_ave);
+	my ($l_cnt, $u_cnt);
+	for my $score ( values %score_hash ) {
+		if ($score > $score_ave) {
+			$upper += $score;
+			$u_cnt ++;
+		} elsif ($score < $score_ave) {
+			$lower += $score;
+			$l_cnt ++;
+		}
+	}
+
+	$upper /= $u_cnt;
+	$lower /= $l_cnt;
+	printf "lower = %.2f; mid = %.2f; upper = %.2f\n" => ($lower, $score_ave, $upper);
 
 
 
-	my @params_expo = (
-	    # Name    Guess      Accuracy
-	    ['d',    $highest,   0.00001],
-	);
-	$square_residual = Algorithm::CurveFit->curve_fit(
-	    formula            => 'd * 2.71828^x',
-	    params             => \@params_expo,
-	    variable           => $variable,
-	    xdata              => \@xdata,
-	    ydata              => \@ydata,
-	    maximum_iterations => $max_iter,
-	);
-	($d) = ($params_expo[0]->[1],);
-
-	my $numer_expo = ($n * sum map { $_ * ($d * exp($_)) } 1..$n) - (sum 1..$n) * (sum map { ($d * exp($_)) } 1..$n);
-	my $denom_expo = sqrt(  ($n * (sum map { $_ ** 2 } 1..$n) - ((sum 1..$n) ** 2))*($n * (sum map { ($d * exp($_))**2 } 1..$n) - (sum map { ($d * exp($_)) } 1..$n)**2)  );
-
-	my $r2_expo = ($numer_expo / $denom_expo) ** 2;
-
-
-
-	my @params_line = (
-	    # Name    Guess      Accuracy
-	    ['e',    $average,   0.00001],
-	    ['f',       0,       0.00001],
-	);
-	$square_residual = Algorithm::CurveFit->curve_fit(
-	    formula            => 'e * x + f',
-	    params             => \@params_line,
-	    variable           => $variable,
-	    xdata              => \@xdata,
-	    ydata              => \@ydata,
-	    maximum_iterations => $max_iter,
-	);
-	($e, $f) = ($params_line[0]->[1],$params_line[1]->[1],);
-
-	my $numer_line = sum(  map { ($score_hash{$word_keys[$_-1]} - ($e * $_ + $f)) ** 2 } 1..$n  );
-	my $denom_line = sum(  map { ($score_hash{$word_keys[$_-1]} - $average) ** 2 } 1..$n  );
-
-	my $r2_line = 1 - ($numer_line / $denom_line - 1);
-
-
-
-	print "POLY: $r2_poly\n";
-	print "EXPO: $r2_expo\n";
-	print "LINE: $r2_line\n";
-
-	binmode STDOUT, ":utf8";
-
-	print "KNOWN:\n";
+	say "KNOWN:";
 	KEY: for my $index ( 0..scalar @word_keys - 1 ) {
-	my $format = "%" . $longest . "s|%s\n";
-	my $score = int (40 * $score_hash{$word_keys[$index]} / $highest);
-	printf $format => ( $word_keys[$index] , '-' x max($score, 0) );
+		my $format = "%" . $longest . "s|%s\n";
+		my $score = $score_hash{$word_keys[$index]};
+
+		my $score_string = sprintf " %5.2f |" => $score;
+		for (1..max($score, $upper)) {
+			if ($score >= $lower and $score <= $upper) {
+				$score_string .= '+' if $_ <= $score;
+			} else {
+				$score_string .= '[' if $_ == int $lower + 1;
+				$score_string .= ']' if $_ == int $upper;
+				$score_string .= '-' if $_ <= int $score;
+				$score_string .= ' ' if $_ >  int $score;
+			}
+		}
+
+		printf $format => ($word_keys[$index], $score_string);
 	}
 	say "\n";
 
-	@word_keys = reverse @word_keys;
 
 
-	if ($r2_poly > $r2_expo and $r2_poly > $r2_line) {
-		$highest = $a * $n ** 2 + $b * $n + $c;
-		print "CALCULATED (poly)\n";
-		KEY: for my $index ( reverse 1..scalar @word_keys ) {
-			my $format = "%" . $longest . "s|%s\n";
-			my $raw    = $a * $index ** 2 + $b * $index + $c;
-			my $score  = int (40 * $raw / $highest);
-			printf $format => ( $word_keys[$index - 1] , '-' x max($score, 0) );
+	my @graph_keys = grep { $lower < $score_hash{$_} and $score_hash{$_} < $upper } @word_keys;
+
+	my $n = scalar @graph_keys;
+
+	if ($n) {
+		my $average = sum map { $score_hash{$_} } @graph_keys / $n;
+
+		my $variable = 'x';
+		my ($a, $b, $c, $d, $e, $f);
+		my @xdata = 1..$n; # The data corresponsing to $variable
+		my @ydata = reverse map { $score_hash{$_} } @graph_keys; # The data on the other axis
+		my @params_poly = (
+		    # Name    Guess      Accuracy
+		    ['a',    $highest,    0.00001],
+		    ['b',    $average,    0.00001],
+		    ['c',       0,        0.00001],
+		);
+		my $max_iter = 100; # maximum iterations
+		my $square_residual = Algorithm::CurveFit->curve_fit(
+		    formula            => 'c + b * x + a * x^2',
+		    params             => \@params_poly,
+		    variable           => $variable,
+		    xdata              => \@xdata,
+		    ydata              => \@ydata,
+		    maximum_iterations => $max_iter,
+		);
+		($a, $b, $c) = ($params_poly[0]->[1],$params_poly[1]->[1],$params_poly[2]->[1]);
+
+		my $numer_poly = ($n * sum map { $_ * ($a * $_ ** 2 + $b * $_ + $c) } 1..$n) - (sum 1..$n) * (sum map { ($a * $_ ** 2 + $b * $_ + $c) } 1..$n);
+		my $denom_poly = sqrt(  ($n * (sum map { $_ ** 2 } 1..$n) - ((sum 1..$n) ** 2))*($n * (sum map { ($a * $_ ** 2 + $b * $_ + $c)**2 } 1..$n) - (sum map { ($a * $_ ** 2 + $b * $_ + $c) } 1..$n)**2)  );
+
+		my $r2_poly = ($numer_poly / ($denom_poly || 1)) ** 2;
+
+
+
+		my @params_expo = (
+		    # Name    Guess      Accuracy
+		    ['d',    $highest,   0.00001],
+		);
+		$square_residual = Algorithm::CurveFit->curve_fit(
+		    formula            => 'd * 2.71828^x',
+		    params             => \@params_expo,
+		    variable           => $variable,
+		    xdata              => \@xdata,
+		    ydata              => \@ydata,
+		    maximum_iterations => $max_iter,
+		);
+		($d) = ($params_expo[0]->[1],);
+
+		my $numer_expo = ($n * sum map { $_ * ($d * exp($_)) } 1..$n) - (sum 1..$n) * (sum map { ($d * exp($_)) } 1..$n);
+		my $denom_expo = sqrt(  ($n * (sum map { $_ ** 2 } 1..$n) - ((sum 1..$n) ** 2))*($n * (sum map { ($d * exp($_))**2 } 1..$n) - (sum map { ($d * exp($_)) } 1..$n)**2)  );
+
+		my $r2_expo = ($numer_expo / ($denom_expo || 1)) ** 2;
+
+
+
+		my @params_line = (
+		    # Name    Guess      Accuracy
+		    ['e',    $average,   0.00001],
+		    ['f',       0,       0.00001],
+		);
+		$square_residual = Algorithm::CurveFit->curve_fit(
+		    formula            => 'e * x + f',
+		    params             => \@params_line,
+		    variable           => $variable,
+		    xdata              => \@xdata,
+		    ydata              => \@ydata,
+		    maximum_iterations => $max_iter,
+		);
+		($e, $f) = ($params_line[0]->[1],$params_line[1]->[1],);
+
+		my $numer_line = sum(  map { ($score_hash{$graph_keys[$_-1]} - ($e * $_ + $f)) ** 2 } 1..$n  );
+		my $denom_line = sum(  map { ($score_hash{$graph_keys[$_-1]} - $average) ** 2 } 1..$n  );
+
+		my $r2_line = 1 - ($numer_line / (($denom_expo - 1) || 1));
+
+
+
+		print "POLY: $r2_poly\n";
+		print "EXPO: $r2_expo\n";
+		print "LINE: $r2_line\n";
+
+
+		@word_keys = reverse @word_keys;
+
+		if ($r2_poly > $r2_expo and $r2_poly > $r2_line) {
+			$highest = $a * $n ** 2 + $b * $n + $c;
+			print "CALCULATED (poly)\n";
+			KEY: for my $index ( reverse 1..scalar @word_keys ) {
+				my $format  = "%" . $longest . "s|%s\n";
+				my $score   = $a * $index ** 2 + $b * $index + $c;
+				my $highest = $a * scalar @word_keys ** 2 + $b * scalar @word_keys + $c;
+				printf $format => ( $word_keys[$index - 1] , '-' x max($score, 0) );
+			}
+		} elsif ($r2_expo > $r2_poly and $r2_expo > $r2_line) {
+			$highest = $d * exp($n);
+			print "CALCULATED (expo)\n";
+			KEY: for my $index ( reverse 1..scalar @word_keys ) {
+				my $format  = "%" . $longest . "s|%s\n";
+				my $score   = $d * exp($index);
+				my $highest = $d * exp(scalar @word_keys);
+				printf $format => ( $word_keys[$index - 1] , '-' x max($score, 0) );
+			}
+		} else {
+			$highest = $e * $n + $f;
+			print "CALCULATED (line)\n";
+			KEY: for my $index ( reverse 1..scalar @word_keys ) {
+				my $format  = "%" . $longest . "s|%s\n";
+				my $score   = $e * $index + $f;
+				my $highest = $e * scalar @word_keys + $f;
+				printf $format => ( $word_keys[$index - 1] , '-' x max($score, 0) );
+			}
 		}
-		print "\n\n\n";
-	} elsif ($r2_expo > $r2_poly and $r2_expo > $r2_line) {
-		$highest = $d * exp($n);
-		print "CALCULATED (expo)\n";
-		KEY: for my $index ( reverse 1..scalar @word_keys ) {
-			my $format = "%" . $longest . "s|%s\n";
-			my $raw    = $d * exp($index);
-			my $score  = int (40 * $raw / $highest);
-			printf $format => ( $word_keys[$index - 1] , '-' x max($score, 0) );
+	}
+	
+		print "\n========================================\n\n\n";
+
+
+	return $self;
+}
+
+sub grow_watchlist {
+	my ($self, $file) = @_;
+
+	for (<$file>) {
+		for my $word ( map { /\b (?: \w \. (?: ['’-] \w+ )?)+ | (?: \w+ ['’-]? )+ (?=\s|\b)/gx } lc $_ ) {
+			$self->watchlist->{$word}++ unless ( exists $self->stopwords->{$word} );
 		}
-		print "\n\n\n";
-	} else {
-		$highest = $e * $n + $f;
-		print "CALCULATED (line)\n";
-		KEY: for my $index ( reverse 1..scalar @word_keys ) {
-			my $format = "%" . $longest . "s|%s\n";
-			my $raw    = $e * $index + $f;
-			my $score  = int (40 * $raw / $highest);
-			printf $format => ( $word_keys[$index - 1] , '-' x max($score, 0) );
-		}
-		print "\n\n\n";
 	}
 
+	$self->_set_watch_count( sum values %{$self->watchlist} // 0 );  #counts the total number of watch_words ever collected
 
 	return $self;
 }
@@ -796,8 +851,6 @@ sub pretty_print {
 	my ($sentences, $fragments, $words) = @{$summary}{'sentences','fragments','words'};
 
 	$return_count ||= 20;
-
-	binmode STDOUT, ":utf8";
 
 	say "SUMMARY:";
 	my @sentence_keys = sort { $sentences->{$b} <=> $sentences->{$a} or $a cmp $b} keys %$sentences;
