@@ -580,7 +580,7 @@ sub develop_stopwords {
 			KEY: for my $index ( reverse 1..scalar @word_keys ) {
 				my $format = "%" . $longest . "s|%s\n";
 				my $score  = $a + $b * $index + $c * $index ** 2;
-				my $score_string = sprintf " %5.2f |%s" => $score, ($score >= $lower and $score <= $upper ? '+' x $score : '-' x $score);
+				my $score_string = sprintf " %5.2f/%5.2f |%s" => $score, $score_hash{$word_keys[$index-1]}, ($score >= $lower and $score <= $upper ? '+' x $score : '-' x $score);
 				printf $format => $word_keys[$index - 1], $score_string;
 			}
 		} else {
