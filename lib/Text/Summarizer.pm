@@ -377,8 +377,8 @@ sub develop_stopwords {
 
 		#removes each word from the *word_hash* unless it occurs more than once amongst all phrases
 		SCRAP: for my $word_hash (@hash_list) {
-			for my $word (keys %{$word_hash->[-1]}) {
-				delete $word_hash->[-1]->{$word} unless $sum_list{$word_hash->[-1]->{$word}} > 1
+			for my $index (keys %{$word_hash->[-1]}) {
+				delete $word_hash->[-1]->{$index} unless $sum_list{$word_hash->[-1]->{$index}} > 1
 			}
 		}
 
@@ -416,7 +416,7 @@ sub develop_stopwords {
 
 		#compile scraps for scoring
 		 JOIN: for my $fragment (@frag_list) {
-			my $scrap  = join ' ' => map { $score_hash{$_}++;
+			my $scrap  = join ' ' => map { $score_hash{$fragment->[-1]->{$_}}++;
 											$fragment->[-1]->{$_} } sort { $a <=> $b } keys %{$fragment->[-1]};
 			$score_hash{$f_word}++;  #scores each *f_word*
 
@@ -438,16 +438,14 @@ sub develop_stopwords {
 	my $highest = $score_hash{$word_keys[0]};
 	my $longest = max map {length} @word_keys;
 
-	$score_hash{$_} = 40 * $score_hash{$_} / $highest for keys %score_hash;
-
 	@word_keys = grep { $score_hash{$_} >= 1 } @word_keys;
 
-
-	my $score_ave = sum( map { $score_hash{$_} } @word_keys ) / scalar @word_keys;
+	my %log_scores = map { $_ => log $score_hash{$_} } @word_keys; 
+	my $score_ave = sum( values %log_scores ) / keys %log_scores;
 
 	my ($low, $lower, $upper, $high) = ($score_ave, 0, 0, $score_ave);
 	my ($l_cnt, $u_cnt);
-	for my $score ( values %score_hash ) {
+	for my $score ( values %log_scores ) {
 		if ($score > $score_ave) {
 			$upper += $score;
 			$u_cnt ++;
@@ -462,17 +460,17 @@ sub develop_stopwords {
 	say "KNOWN:";
 	KEY: for my $index ( 0..scalar @word_keys - 1 ) {
 		my $format = "%" . $longest . "s|%s\n";
-		my $score = $score_hash{$word_keys[$index]};
+		my $score = $log_scores{$word_keys[$index]};
 
 		my $score_string = sprintf " %5.2f |" => $score;
-		for (1..max($score, $upper)) {
+		for (0..max($score, $upper)) {
 			if ($score >= $lower and $score <= $upper) {
 				$score_string .= '+' if $_ <= $score;
 			} else {
+				$score_string .= ']' if $_ == int $upper;
 				$score_string .= '-' if $_ <= int $score;
 				$score_string .= ' ' if $_ >  int $score;
-				$score_string .= '[' if $_ == int $lower + 1;
-				$score_string .= ']' if $_ == int $upper;
+				$score_string .= '[' if $_ == int $lower;
 			}
 		}
 
@@ -483,118 +481,45 @@ sub develop_stopwords {
 
 
 
-	my @graph_keys = map { $score_hash{$_} } reverse grep { $score_hash{$_} >= $lower and $score_hash{$_} <= $upper } @word_keys;
-	my $n = scalar @graph_keys;
+	my @graph_data = map { $log_scores{$_} } reverse grep { $log_scores{$_} >= $lower and $log_scores{$_} <= $upper } @word_keys;
+	my $n = scalar @graph_data;
 
 	if ($n) {
-		my $average = sum( @graph_keys ) / $n;
-		my @xdata = 1..$n; # The data corresponsing to $variable
-		my @ydata = @graph_keys; # The data on the other axis
+		my $average = sum( @graph_data ) / $n;
+		my @xdata = map { log $_ } 1..$n; # The data corresponsing to $variable
+		my @ydata = @graph_data; # The data on the other axis
 		my $max_iter = 100; # maximum iterations
-
-
-
-		my @params_poly = (
-		    # Name    Guess      Accuracy
-		    ['a',       0,        0.00001],
-		    ['b',    $average,    0.00001],
-		    ['c',    $highest,    0.00001],
-		);
-		Algorithm::CurveFit->curve_fit(
-		    formula            => 'a + b * x + c * x^2',
-		    params             => \@params_poly,
-		    xdata              => \@xdata,
-		    ydata              => \@ydata,
-		    maximum_iterations => $max_iter,
-		);
-		my ($a, $b, $c) = ($params_poly[0]->[1],$params_poly[1]->[1],$params_poly[2]->[1]);
-
-		my $numer_poly = ($n * sum map { $_ * ($a + $b * $_ + $c * $_ ** 2) } 1..$n) - (sum 1..$n) * (sum map { ($a + $b * $_ + $c * $_ ** 2) } 1..$n);
-		my $denom_poly = ($n * (sum map { $_ ** 2 } 1..$n) - ((sum 1..$n) ** 2))*($n * (sum map { ($a + $b * $_ + $c * $_ ** 2)**2 } 1..$n) - (sum map { ($a + $b * $_ + $c * $_ ** 2) } 1..$n)**2);
-
-		my $r2_poly = $numer_poly ** 2 / $denom_poly;
-
-
-
 		my @params_line = (
 		    # Name    Guess      Accuracy
-		    ['l',       0,       0.00001],
 		    ['m',    $highest,   0.00001],
+		    ['b',       0,       0.00001],
 		);
 		Algorithm::CurveFit->curve_fit(
-		    formula            => 'l + m * x',
+		    formula            => 'm * x + b',
 		    params             => \@params_line,
 		    xdata              => \@xdata,
 		    ydata              => \@ydata,
 		    maximum_iterations => $max_iter,
 		);
-		my ($l, $m) = ($params_line[0]->[1],$params_line[1]->[1]);
+		my ($m, $b) = ($params_line[0]->[1],$params_line[1]->[1]);
 
-		my $numer_line = sum(  map { ($graph_keys[$_ - 1] - ($l + $m * $_)) ** 2 } 1..$n  );
-		my $denom_line = sum(  map { ($graph_keys[$_ - 1] - $average) ** 2 } 1..$n  );
+		my $numer_line = sum(  map { ($graph_data[$_ - 1] - ($m * $_ + $b)) ** 2 } 1..$n  );
+		my $denom_line = sum(  map { ($graph_data[$_ - 1] - $average) ** 2 } 1..$n  );
 
 		my $r2_line = 1 - $numer_line / $denom_line;
 
-
-
-		my @params_expo = (
-		    # Name    Guess      Accuracy
-		    ['u',       0,       0.00001],
-		    ['v',    $highest,   0.00001],
-		);
-		Algorithm::CurveFit->curve_fit(
-		    formula            => 'u + v * 2.71828^x',
-		    params             => \@params_expo,
-		    xdata              => \@xdata,
-		    ydata              => \@ydata,
-		    maximum_iterations => $max_iter,
-		);
-		my ($u, $v) = ($params_expo[0]->[1],$params_expo[1]->[1]);
-
-		my $numer_expo = ($n * sum map { $_ * ($u + $v * exp($_)) } 1..$n) - (sum 1..$n) * (sum map { ($u + $v * exp($_)) } 1..$n);
-		my $denom_expo = ($n * (sum map { $_ ** 2 } 1..$n) - ((sum 1..$n) ** 2)) * ($n * (sum map { ($u + $v * exp($_))**2 } 1..$n) - (sum map { ($u + $v * exp($_)) } 1..$n)**2);
-
-		my $r2_expo = $numer_expo ** 2 / $denom_expo;
-
-
-
-
-		print "EXPO: $r2_expo\n";
-		print "POLY: $r2_poly\n";
 		print "LINE: $r2_line\n";
 
 		@word_keys = reverse @word_keys;
 
-		if ($r2_expo > $r2_poly and $r2_expo > $r2_line) {
-			$highest = $u + $v * exp($n);
-			print "CALCULATED (expo):\n";
-			KEY: for my $index ( reverse 1..scalar @word_keys ) {
-				my $format = "%" . $longest . "s|%s\n";
-				my $score  = $u + $v * exp($index);
-				my $score_string = sprintf " %5.2f |%s" => $score, ($score >= $lower and $score <= $upper ? '+' x $score : '-' x $score);
-				printf $format => $word_keys[$index - 1], $score_string;
-			}
-		} elsif ($r2_poly > $r2_expo and $r2_poly > $r2_line) {
-			$highest = $a + $b * $n + $c * $n ** 2;
-			print "CALCULATED (poly):\n";
-			KEY: for my $index ( reverse 1..scalar @word_keys ) {
-				my $format = "%" . $longest . "s|%s\n";
-				my $score  = $a + $b * $index + $c * $index ** 2;
-				my $score_string = sprintf " %5.2f/%5.2f |%s" => $score, $score_hash{$word_keys[$index-1]}, ($score >= $lower and $score <= $upper ? '+' x $score : '-' x $score);
-				printf $format => $word_keys[$index - 1], $score_string;
-			}
-		} else {
-			$highest = $l + $m * $n;
-			print "CALCULATED (line):\n";
-			KEY: for my $index ( reverse 1..scalar @word_keys ) {
-				my $format = "%" . $longest . "s|%s\n";
-				my $score  = $l + $m * $index;
-				my $score_string = sprintf " %5.2f |%s" => $score, ($score >= $lower and $score <= $upper ? '+' x $score : '-' x $score);
-				printf $format => $word_keys[$index - 1], $score_string;
-			}
+		$highest = $b + $m * $n;
+		print "CALCULATED (line):\n";
+		KEY: for my $index ( reverse 1..scalar @word_keys ) {
+			my $format = "%" . $longest . "s|%s\n";
+			my $score  = $b + $m * log $index;
+			my $score_string = sprintf " %5.2f |%s" => $score, ($score >= $lower and $score <= $upper ? '+' x $score : '-' x $score);
+			printf $format => $word_keys[$index - 1], $score_string;
 		}
-	} else {
-		print "BOUNDS TOO SMALL FOR RELIABLE TESTING\n";
 	}
 	
 	
