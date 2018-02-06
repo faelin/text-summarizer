@@ -407,23 +407,23 @@ sub _build_frag_list {
 	F_WORD: for my $f_word (keys %{$self->phrase_hash}) {
 		#find common phrase-fragments
 		my %full_phrase; #*inter_hash* contains phrase fragments;
-		my (@hash_list, %sum_list); #*hash_list* contains ordered, formatted lists of each word in the phrase fragment;  *sum_list* contains the total number of times each word appears in all phrases for the given *f_word*
+		my (@hash_list, %sums_hash, %words_count); #*hash_list* contains ordered, formatted lists of each word in the phrase fragment;  *sums_hash* contains the total number of times each word appears in all phrases for the given *f_word*
 		ORDER: for my $phrase (@{$self->phrase_hash->{$f_word}}) {
-			my %ordered_words = map { $sum_list{$phrase->[$_]}++; ($_ => $phrase->[$_]) } (1..scalar @{$phrase} - 1);
+			my %ordered_words = map { $sums_hash{$phrase->[$_]}++; ($_ => $phrase->[$_]) } (1..scalar @{$phrase} - 1);
 				# *words* contains an ordered, formatted list of each word in the given phrase fragment, looks like:
 				# 	'01' => 'some'
 				#	'02' => 'word'
 				#	'03' => 'goes'
 				# 	'04' => 'here'
-			my %full_phrase = %ordered_words;
-			push @hash_list => [$f_word, \%full_phrase, \%ordered_words];
+			$words_count{$_}++ for values %ordered_words;
+			push @hash_list => [$f_word, \%words_count, \%ordered_words];
 		}
 
 
 		#removes each word from the *word_hash* unless it occurs more than once amongst all phrases
 		SCRAP: for my $word_hash (@hash_list) {
 			for my $index (keys %{$word_hash->[-1]}) {
-				delete $word_hash->[-1]->{$index} unless $sum_list{$word_hash->[-1]->{$index}} > 1
+				delete $word_hash->[-1]->{$index} unless $sums_hash{$word_hash->[-1]->{$index}} > 1
 			}
 		}
 
@@ -469,22 +469,26 @@ sub develop_stopwords {
 	my $self = shift;
 
 	my %score_hash; #*score_hash* contains score values for words in those phrases
-	F_WORD: for my $f_word (keys %{$self->phrase_hash}) {
-		 JOIN: for my $fragment (@{$self->frag_list}) {
-			#compile scraps for scoring
 
-			my $scrap  = join ' ' => map { $score_hash{$fragment->[-1]->{$_}}++;
-											$fragment->[-1]->{$_} } sort { $a <=> $b } keys %{$fragment->[-1]};
-			$score_hash{$f_word}++;  #scores each *f_word*
+	$score_hash{$_}++ for keys %{$self->phrase_hash};
 
-			for my $word (split ' ' => $scrap) {
-				$score_hash{$word} += $self->freq_hash->{$word}  // 0;
-				$score_hash{$word} += $self->sigma_hash->{$word} // 0;
-			}
+	 JOIN: for my $fragment (@{$self->frag_list}) {
+		#compile scraps for scoring
+
+		my $scrap  = join ' ' => map { $score_hash{$fragment->[-1]->{$_}}++;
+										$fragment->[-1]->{$_} } sort { $a <=> $b } keys %{$fragment->[-1]};
+		;  #scores each *f_word*
+
+		for my $word (split ' ' => $scrap) {
+			$score_hash{$word} += $self->freq_hash->{$word}  // 0;
+			$score_hash{$word} += $self->sigma_hash->{$word} // 0;
+			$score_hash{$word} -= $fragment->[1]->{$word}    // 0;
 		}
-
-		grep { delete $score_hash{$_} if $self->stopwords->{$_} } keys %score_hash;
 	}
+
+	grep { delete $score_hash{$_} if $self->stopwords->{$_} } keys %score_hash;
+
+
 
 
 	my @word_keys = sort { $score_hash{$b} <=> $score_hash{$a} or $a cmp $b } keys %score_hash;
@@ -560,7 +564,7 @@ sub develop_stopwords {
 		KEY: for my $index ( reverse 1..scalar @word_keys ) {
 			my $format = "%" . $longest . "s|%s\n";
 			my $score  = $a + $b * $index + $c * $index**2;
-			my $score_string = sprintf " %5.2f |%s" => $score, ($score >= $lower and $score <= $upper ? '+' x $score : '-' x $score);
+			my $score_string = sprintf " %5.2f |%s" => $score, ($score >= $lower and $score < $score_hash{$word_keys[$index - 1]} ? '-' x $score : '+' x $score);
 			printf $format => $word_keys[$index - 1], $score_string;
 		}
 	} else {
