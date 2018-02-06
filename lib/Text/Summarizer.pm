@@ -253,7 +253,7 @@ sub tokenize {
 
 	my $full_text = $text;
 		#contains the full body of text
-	my @sentences = split qr/(?|   (?<=(?<!\s[A-Z][a-z]) (?<!\s[A-Z][a-z]{2}) \. (?![A-Z]\.|\s[a-z0-9]) | \! | \?) (?:(?=[A-Z])|\s+)
+	my @sentences = split qr/(?|   (?<=(?<!\s[A-Z][a-z]) (?<!\s[A-Z][a-z]{2}) \. (?![A-Z0-9]\.|\s[a-z0-9]) | \! | \?) (?:(?=[A-Z])|\s+)
 							   |   (?: \n+ | ^\s+ | \s+$ )
 							)/mx => $full_text;
 		# array of sentences
@@ -290,7 +290,7 @@ sub develop_stopwords {
 	 	$freq_hash{$word}++ unless $self->stopwords->{$word};
 	}
 	grep { delete $freq_hash{$_} if $freq_hash{$_} < $min_freq_thresh } keys %freq_hash;
-		#remove words that appear less than the *$min_freq_thresh* (defaults to 1)
+		#remove words that appear less than the *$min_freq_thresh*
 	$self->_set_freq_hash( \%freq_hash );
 
 
@@ -430,37 +430,32 @@ sub develop_stopwords {
 	}
 
 
-
-
-
-
 	my @word_keys = sort { $score_hash{$b} <=> $score_hash{$a} or $a cmp $b } keys %score_hash;
 	my $highest = $score_hash{$word_keys[0]};
 	my $longest = max map {length} @word_keys;
 
-	@word_keys = grep { $score_hash{$_} >= 1 } @word_keys;
+	$score_hash{$_} = 40 * $score_hash{$_} / $highest for keys %score_hash;
+	@word_keys = reverse grep { $score_hash{$_} >= 1 } @word_keys;
 
-	my %log_scores = map { $_ => log $score_hash{$_} } @word_keys; 
-	my $score_ave = sum( values %log_scores ) / keys %log_scores;
+	my $score_ave = sum( values %score_hash ) / keys %score_hash;
 
-	my ($low, $lower, $upper, $high) = ($score_ave, 0, 0, $score_ave);
-	my ($l_cnt, $u_cnt);
-	for my $score ( values %log_scores ) {
-		if ($score > $score_ave) {
-			$upper += $score;
-			$u_cnt ++;
-		} elsif ($score < $score_ave) {
-			$lower += $score;
-			$l_cnt ++;
-		}
-	}
-	$upper /= $u_cnt;
-	$lower /= $l_cnt;
+	my @scores = map { $score_hash{$_} } @word_keys;
+	my @low    = @scores[ 0..(int scalar @scores / 2 - 1.5) ];
+	my @high   = @scores[ (int scalar @scores / 2 + 1)..(int scalar @scores - 1) ];
+	my @LM     = @low[  (int scalar @low / 2 - 0.5)..(int scalar @low / 2)   ];
+	my @UM     = @high[ (int scalar @high / 2 - 0.5)..(int scalar @high / 2) ];
+	my $Q1     = sum( @LM ) / scalar @LM;
+	my $Q3     = sum( @UM ) / scalar @UM;
+	my $IQR    = $Q3 - $Q1;
+	my $lower  = $Q1;
+	my $upper  = $Q3 + 1.5 * $IQR;
+
+
 
 	say "KNOWN:";
-	KEY: for my $index ( 0..scalar @word_keys - 1 ) {
+	KEY: for my $index ( reverse 0..scalar @word_keys - 1 ) {
 		my $format = "%" . $longest . "s|%s\n";
-		my $score = $log_scores{$word_keys[$index]};
+		my $score = $score_hash{$word_keys[$index]};
 
 		my $score_string = sprintf " %5.2f |" => $score;
 		for (0..max($score, $upper)) {
@@ -481,45 +476,38 @@ sub develop_stopwords {
 
 
 
-	my @graph_data = map { $log_scores{$_} } reverse grep { $log_scores{$_} >= $lower and $log_scores{$_} <= $upper } @word_keys;
+	my @graph_data = grep { $_ >= $lower and $_ <= $upper } map { $score_hash{$_} } @word_keys;
 	my $n = scalar @graph_data;
 
-	if ($n) {
+	if ($n > 2) {
 		my $average = sum( @graph_data ) / $n;
-		my @xdata = map { log $_ } 1..$n; # The data corresponsing to $variable
+		my @xdata = 1..$n; # The data corresponsing to $variable
 		my @ydata = @graph_data; # The data on the other axis
 		my $max_iter = 100; # maximum iterations
 		my @params_line = (
 		    # Name    Guess      Accuracy
-		    ['m',    $highest,   0.00001],
-		    ['b',       0,       0.00001],
+		    ['a',       0,       0.00001],
+		    ['b',   $average,    0.00001],
+		    ['c',   $highest,    0.00001],
 		);
 		Algorithm::CurveFit->curve_fit(
-		    formula            => 'm * x + b',
+		    formula            => 'a + b * x + c * x^2',
 		    params             => \@params_line,
 		    xdata              => \@xdata,
 		    ydata              => \@ydata,
 		    maximum_iterations => $max_iter,
 		);
-		my ($m, $b) = ($params_line[0]->[1],$params_line[1]->[1]);
+		my ($a, $b, $c) = ($params_line[0]->[1],$params_line[1]->[1],$params_line[2]->[1]);
 
-		my $numer_line = sum(  map { ($graph_data[$_ - 1] - ($m * $_ + $b)) ** 2 } 1..$n  );
-		my $denom_line = sum(  map { ($graph_data[$_ - 1] - $average) ** 2 } 1..$n  );
-
-		my $r2_line = 1 - $numer_line / $denom_line;
-
-		print "LINE: $r2_line\n";
-
-		@word_keys = reverse @word_keys;
-
-		$highest = $b + $m * $n;
-		print "CALCULATED (line):\n";
+		print "CALCULATED:\n";
 		KEY: for my $index ( reverse 1..scalar @word_keys ) {
 			my $format = "%" . $longest . "s|%s\n";
-			my $score  = $b + $m * log $index;
+			my $score  = $a + $b * $index + $c * $index**2;
 			my $score_string = sprintf " %5.2f |%s" => $score, ($score >= $lower and $score <= $upper ? '+' x $score : '-' x $score);
 			printf $format => $word_keys[$index - 1], $score_string;
 		}
+	} else {
+		print "SAMPLE SIZE TOO SMALL FOR ACCURATE BEST-FIT CURVE";
 	}
 	
 	
@@ -555,7 +543,7 @@ sub analyze_phrases {
 	 	$freq_hash{$word}++ unless $self->stopwords->{$word};
 	}
 	grep { delete $freq_hash{$_} if $freq_hash{$_} < $min_freq_thresh } keys %freq_hash;
-		#remove words that appear less than the *$min_freq_thresh* (defaults to 1)
+		#remove words that appear less than the *$min_freq_thresh*
 	$self->_set_freq_hash( \%freq_hash );
 
 
