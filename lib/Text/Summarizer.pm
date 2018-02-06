@@ -108,6 +108,11 @@ has sentences => (
 	isa => Ref['ARRAY'],
 );
 
+has sen_words => (
+	is => 'rwp',
+	isa => Ref['ARRAY'],
+);
+
 has phrase_list => (
 	is => 'rwp',
 	isa => Ref['HASH'],
@@ -118,7 +123,7 @@ has word_list => (
 	isa => Ref['ARRAY'],
 );
 
-has sen_words => (
+has frag_list => (
 	is => 'rwp',
 	isa => Ref['ARRAY'],
 );
@@ -195,6 +200,7 @@ sub scan_text {
 	my ($self, $text) = @_;
 
 	$self->tokenize( $text );	#breaks the provided file into sentences and individual words
+
 	$self->develop_stopwords;	#analyzes the frequency and clustering of words within the provided file
 	#$self->_store_stopwords;
 
@@ -224,6 +230,7 @@ sub summarize_text {
 	my ($self, $text) = @_;
 
 	$self->tokenize($text);		#breaks the provided file into sentences and individual words
+
 	$self->analyze_phrases;		#analyzes the frequency and clustering of words within the provided file
 
 	return $self->summary;
@@ -274,15 +281,20 @@ sub tokenize {
 	$self->_set_word_list( \@word_list );
 	$self->_set_sen_words( \@sen_words );
 
+	$self->_build_freq_hash;
+	$self->_build_cluster_hash;
+	$self->_build_phrase_hash;
+	$self->_build_sigma_hash;
+	$self->_build_frag_list;
+
 
 	return $self;
 }
 
 
 
-sub develop_stopwords {
+sub _build_freq_hash {
 	my $self = shift;
-
 
 	my $min_freq_thresh = int($self->article_length * $self->freq_constant) // 1; #estimates a minimum threshold of occurence for frequently occuring words
 	my %freq_hash; #counts the number of times each word appears in the *%word_list* hash
@@ -291,8 +303,14 @@ sub develop_stopwords {
 	}
 	grep { delete $freq_hash{$_} if $freq_hash{$_} < $min_freq_thresh } keys %freq_hash;
 		#remove words that appear less than the *$min_freq_thresh*
+
 	$self->_set_freq_hash( \%freq_hash );
 
+	return $self;
+}
+
+sub _build_cluster_hash {
+	my $self = shift;
 
 	my (%cluster_hash, %cluster_count);
 	my $abs_pos = 0;
@@ -305,20 +323,27 @@ sub develop_stopwords {
 			$abs_pos++;
 
 			if ( exists $self->freq_hash->{$sen_words[$position]}) { ## true if the given word at index *position* appears in the *freq_hash*
-				my %word = ( abs => $abs_pos, sen => $sen_index, pos => $position, cnt => ++$cluster_count{$sen_words[$position]} );
-					# hash-vector of three elements:
+				my %word = ( abs => $abs_pos, sen => $sen_index, pos => $position, cnt => $cluster_count{$sen_words[$position]}++ );
+					# hash-vector of the following elements:
+					#   abs => absolute position of the currrent word within the entire token-stream
 					#	sen => the index of the current sentence
-					#	pos => index of the current word within the current sentence
+					#	pos => position of the current word within the current sentence
 					#	cnt => number of times the given word has appeared in the entire text file
 				push @{$cluster_hash{$sen_words[$position]}} => \%word;
 			}
 		}
 	}
+
 	$self->_set_cluster_hash( \%cluster_hash );
 
+	return $self;
+}
+
+sub _build_phrase_hash {
+	my $self = shift;
 
 	#create long-form phrases around frequently used words by tracking forward and backward *phrase_radius* from any given *c_word*
-	my (%phrase_hash, %sigma_hash, %dist_list);
+	my %phrase_hash;
 	for my $c_word (keys %{$self->cluster_hash}) {
 		for my $c_vector (@{$self->cluster_hash->{$c_word}}) {
 
@@ -327,6 +352,8 @@ sub develop_stopwords {
 			# *pos* indicates the position of the *c_word* within the sentence (see above)
 			# *cnt* counts the total number of times the word has been detected thus far
 
+			$DB::single = 1 unless defined $self->sen_words->[$sen];
+
 			my @phrase = @{$self->sen_words->[$sen]}[ max($pos - $self->phrase_radius, 0) .. min($pos + $self->phrase_radius, scalar(@{$self->sen_words->[$sen]}) - 1) ];
 				#array slice containing only tokens within *phrase_radius* of the *c_word* within the given sentence
 
@@ -334,34 +361,52 @@ sub develop_stopwords {
 			push @{$phrase_hash{$c_word}} => \@phrase if scalar @phrase > $self->phrase_threshold + 1;
 				#the *phrase_hash* can only contain a given *phrase* array if it is longer than the defined *phrase_threshold* + 1  (defaults to 3)
 		}
-
-		#create a list of the distances between each instance of the current *c_word*
-		my ($L_pos, $R_pos);
-		for (my $i = 0; $i < scalar @{$self->cluster_hash->{$c_word}}; $i++) {
-			$R_pos = $self->cluster_hash->{$c_word}->[$i]->{abs};
-
-			my $dist = $R_pos - ($L_pos // $R_pos);
-			push @{$dist_list{$c_word}} => $dist if $dist >= 0;
-
-			$L_pos = $R_pos;
-		}
-
-
-		#the following is used for scoring purposes, and is used only to determine the *sigma* score (population standard deviation) of the given *c_word*
-		my $pop_size = scalar @{$dist_list{$c_word}} or 1;
-		my $pop_ave  = sum0( @{$dist_list{$c_word}} ) / $pop_size;
-		$sigma_hash{$c_word} = int sqrt( sum( map { ($_ - $pop_ave)**2 } @{$dist_list{$c_word}} ) / $pop_size );	#pop. std. deviation
 	}
 
-	$self->_set_sigma_hash( \%sigma_hash );
 	$self->_set_phrase_hash( \%phrase_hash );
 
+	return $self;
+}
 
-	#find common phrase-fragments
-	my (%inter_hash, %score_hash, %bare_phrase, %full_phrase); #*inter_hash* contains phrase fragments;  *score_hash* contains score values for words in those phrases
+sub _build_sigma_hash {
+	my $self = shift;
+
+	#determine population standard deviation for word clustering
+	my %sigma_hash;
+	for my $c_word (keys %{$self->cluster_hash}) {
+		for my $c_vector (@{$self->cluster_hash->{$c_word}}) {
+
+			#create a list of the distances between each instance of the current *c_word*
+			my %dist_list;
+			my ($L_pos, $R_pos);
+			for (my $i = 0; $i < scalar @{$self->cluster_hash->{$c_word}}; $i++) {
+				$R_pos = $self->cluster_hash->{$c_word}->[$i]->{abs};
+
+				my $dist = $R_pos - ($L_pos // $R_pos);
+				push @{$dist_list{$c_word}} => $dist if $dist >= 0;
+
+				$L_pos = $R_pos;
+			}
+
+
+			#the following is used for scoring purposes, and is used only to determine the *sigma* score (population standard deviation) of the given *c_word*
+			my $pop_size = scalar @{$dist_list{$c_word}} or 1;
+			my $pop_ave  = sum0( @{$dist_list{$c_word}} ) / $pop_size;
+			$sigma_hash{$c_word} = int sqrt( sum( map { ($_ - $pop_ave)**2 } @{$dist_list{$c_word}} ) / $pop_size );	#pop. std. deviation
+		}
+	}
+	$self->_set_sigma_hash( \%sigma_hash );
+
+	return $self;
+}
+
+sub _build_frag_list {
+	my $self = shift;
+
+	my @frag_list;
 	F_WORD: for my $f_word (keys %{$self->phrase_hash}) {
-
-
+		#find common phrase-fragments
+		my %full_phrase; #*inter_hash* contains phrase fragments;
 		my (@hash_list, %sum_list); #*hash_list* contains ordered, formatted lists of each word in the phrase fragment;  *sum_list* contains the total number of times each word appears in all phrases for the given *f_word*
 		ORDER: for my $phrase (@{$self->phrase_hash->{$f_word}}) {
 			my %ordered_words = map { $sum_list{$phrase->[$_]}++; ($_ => $phrase->[$_]) } (1..scalar @{$phrase} - 1);
@@ -384,7 +429,6 @@ sub develop_stopwords {
 
 
 		#break phrases fragments into "scraps" (consecutive runs of words within the fragment)
-		my @frag_list;
 		 FRAG: for my $word_hash (@hash_list) {
 			my (%L_scrap, %R_scrap); #a "scrap" is a sub-fragment
 			my ($prev, $curr, $next) = (-1,0,0); #used to find consecutive sequences of words
@@ -412,17 +456,30 @@ sub develop_stopwords {
 			%R_scrap = (); #resets the *R_scrap*
 			push @frag_list => [$word_hash->[0], $word_hash->[1], $word_hash->[2], \%L_scrap] if $real and scalar keys %L_scrap >= $self->phrase_threshold;
 		}
+	}
+	
+	$self->_set_frag_list( \@frag_list );
+
+	return $self;
+}
 
 
-		#compile scraps for scoring
-		 JOIN: for my $fragment (@frag_list) {
+
+sub develop_stopwords {
+	my $self = shift;
+
+	my %score_hash; #*score_hash* contains score values for words in those phrases
+	F_WORD: for my $f_word (keys %{$self->phrase_hash}) {
+		 JOIN: for my $fragment (@{$self->frag_list}) {
+			#compile scraps for scoring
+
 			my $scrap  = join ' ' => map { $score_hash{$fragment->[-1]->{$_}}++;
 											$fragment->[-1]->{$_} } sort { $a <=> $b } keys %{$fragment->[-1]};
 			$score_hash{$f_word}++;  #scores each *f_word*
 
 			for my $word (split ' ' => $scrap) {
-				$score_hash{$word} += $freq_hash{$word}  // 0;
-				$score_hash{$word} += $sigma_hash{$word} // 0;
+				$score_hash{$word} += $self->freq_hash->{$word}  // 0;
+				$score_hash{$word} += $self->sigma_hash->{$word} // 0;
 			}
 		}
 
@@ -479,7 +536,7 @@ sub develop_stopwords {
 	my @graph_data = grep { $_ >= $lower and $_ <= $upper } map { $score_hash{$_} } @word_keys;
 	my $n = scalar @graph_data;
 
-	if ($n > 2) {
+	if ($n > 4) {
 		my $average = sum( @graph_data ) / $n;
 		my @xdata = 1..$n; # The data corresponsing to $variable
 		my @ydata = @graph_data; # The data on the other axis
@@ -537,138 +594,13 @@ sub analyze_phrases {
 	my $self = shift;
 
 
-	my $min_freq_thresh = int($self->article_length * $self->freq_constant) // 1; #estimates a minimum threshold of occurence for frequently occuring words
-	my %freq_hash; #counts the number of times each word appears in the *%word_list* hash
-	for my $word (@{$self->word_list}) {
-	 	$freq_hash{$word}++ unless $self->stopwords->{$word};
-	}
-	grep { delete $freq_hash{$_} if $freq_hash{$_} < $min_freq_thresh } keys %freq_hash;
-		#remove words that appear less than the *$min_freq_thresh*
-	$self->_set_freq_hash( \%freq_hash );
-
-
-	my (%cluster_hash, %cluster_count);
-	my $abs_pos = 0;
-	for my $sen_index (0..scalar @{$self->sentences} - 1) { #gives the index of each sentence in the article
-		my @sen_words = @{$self->sen_words->[$sen_index]}; 
-						# creates an array of each word in the given sentence,
-						# given that the word is not a stopword and is longer than the given *word_length_threshold*
-		
-		for my $position (0..scalar @sen_words - 1) { #iterates across each word in the sentence
-			$abs_pos++;
-
-			if ( exists $self->freq_hash->{$sen_words[$position]}) { ## true if the given word at index *position* appears in the *freq_hash*
-				my %word = ( abs => $abs_pos, sen => $sen_index, pos => $position, cnt => ++$cluster_count{$sen_words[$position]} );
-					# hash-vector of three elements:
-					#	sen => the index of the current sentence
-					#	pos => index of the current word within the current sentence
-					#	cnt => number of times the given word has appeared in the entire text file
-				push @{$cluster_hash{$sen_words[$position]}} => \%word;
-			}
-		}
-	}
-	$self->_set_cluster_hash( \%cluster_hash );
-
-
-	#create long-form phrases around frequently used words by tracking forward and backward *phrase_radius* from any given *c_word*
-	my (%phrase_hash, %sigma_hash, %dist_list);
-	for my $c_word (keys %{$self->cluster_hash}) {
-		for my $c_vector (@{$self->cluster_hash->{$c_word}}) {
-
-			my ($sen, $pos, $cnt) = @$c_vector{'sen', 'pos', 'cnt'};
-			# *sen* indicates which sentence the current *c_word* appears in
-			# *pos* indicates the position of the *c_word* within the sentence (see above)
-			# *cnt* counts the total number of times the word has been detected thus far
-
-			my @phrase = @{$self->sen_words->[$sen]}[ max($pos - $self->phrase_radius, 0) .. min($pos + $self->phrase_radius, scalar(@{$self->sen_words->[$sen]}) - 1) ];
-				#array slice containing only tokens within *phrase_radius* of the *c_word* within the given sentence
-
-			unshift @phrase => $self->sentences->[$sen]; #begins the *phrase* array with a complete, unedited sentence (for reference only)
-			push @{$phrase_hash{$c_word}} => \@phrase if scalar @phrase > $self->phrase_threshold + 1;
-				#the *phrase_hash* can only contain a given *phrase* array if it is longer than the defined *phrase_threshold* + 1  (defaults to 3)
-		}
-
-		#create a list of the distances between each instance of the current *c_word*
-		my ($L_pos, $R_pos);
-		for (my $i = 0; $i < scalar @{$self->cluster_hash->{$c_word}}; $i++) {
-			$R_pos = $self->cluster_hash->{$c_word}->[$i]->{abs};
-
-			my $dist = $R_pos - ($L_pos // $R_pos);
-			push @{$dist_list{$c_word}} => $dist if $dist >= 0;
-
-			$L_pos = $R_pos;
-		}
-
-
-		#the following is used for scoring purposes, and is used only to determine the *sigma* score (population standard deviation) of the given *c_word*
-		my $pop_size = scalar @{$dist_list{$c_word}} or 1;
-		my $pop_ave  = sum0( @{$dist_list{$c_word}} ) / $pop_size;
-		$sigma_hash{$c_word} = int sqrt( sum( map { ($_ - $pop_ave)**2 } @{$dist_list{$c_word}} ) / $pop_size );	#pop. std. deviation
-	}
-
-	$self->_set_sigma_hash( \%sigma_hash );
-	$self->_set_phrase_hash( \%phrase_hash );
-
 
 	#find common phrase-fragments
 	my (%inter_hash, %score_hash, %bare_phrase, %full_phrase); #*inter_hash* contains phrase fragments;  *score_hash* contains score values for words in those phrases
 	F_WORD: for my $f_word (keys %{$self->phrase_hash}) {
 
-
-		my (@hash_list, %sum_list); #*hash_list* contains ordered, formatted lists of each word in the phrase fragment;  *sum_list* contains the total number of times each word appears in all phrases for the given *f_word*
-		ORDER: for my $phrase (@{$self->phrase_hash->{$f_word}}) {
-			my %ordered_words = map { $sum_list{$phrase->[$_]}++; ($_ => $phrase->[$_]) } (1..scalar @{$phrase} - 1);
-				# *words* contains an ordered, formatted list of each word in the given phrase fragment, looks like:
-				# 	'01' => 'some'
-				#	'02' => 'word'
-				#	'03' => 'goes'
-				# 	'04' => 'here'
-			my %full_phrase = %ordered_words;
-			push @hash_list => [$f_word, \%full_phrase, \%ordered_words];
-		}
-
-
-		#removes each word from the *word_hash* unless it occurs more than once amongst all phrases
-		SCRAP: for my $word_hash (@hash_list) {
-			for my $word (keys %{$word_hash->[-1]}) {
-				delete $word_hash->[-1]->{$word} unless $sum_list{$word_hash->[-1]->{$word}} > 1
-			}
-		}
-
-
-		#break phrases fragments into "scraps" (consecutive runs of words within the fragment)
-		my @frag_list;
-		 FRAG: for my $word_hash (@hash_list) {
-			my (%L_scrap, %R_scrap); #a "scrap" is a sub-fragment
-			my ($prev, $curr, $next) = (-1,0,0); #used to find consecutive sequences of words
-			my $real = 0; #flag for stopwords identification
-
-			my @word_keys = sort { $a <=> $b } keys %{$word_hash->[-1]}; # *word_keys* contains a series of index-values
-			for (my $i = 0; $i < scalar @word_keys; $i++ ) {
-				$curr = $word_keys[$i];
-				$next = $word_keys[$i+1] if $i < scalar @word_keys - 1; # if-statement prevents out-of-bounds error
-
-				if ( $next == $curr + 1 or $curr == $prev + 1 ) {
-					unless ($curr == $prev + 1) {  #resets *R_scrap* when the *curr* index skips over a number (i.e. a new scrap is encountered)
-						%L_scrap = %R_scrap if keys %L_scrap <= keys %R_scrap; #chooses the longest or most recent scrap
-						%R_scrap = (); #resets the *R_scrap*
-					}
-					$R_scrap{$curr} = $word_hash->[-1]->{$curr};
-					$real = 1 unless $self->stopwords->{$R_scrap{$curr}}; #ensures that scraps consisting only of stopwords are ignored
-				} else {
-					%L_scrap = %R_scrap if keys %L_scrap <= keys %R_scrap; #chooses the longest or most recent scrap
-					%R_scrap = (); #resets the *R_scrap*
-				}
-				$prev = $curr;
-			}
-			%L_scrap = %R_scrap if keys %L_scrap <= keys %R_scrap; #chooses the longest or most recent scrap
-			%R_scrap = (); #resets the *R_scrap*
-			push @frag_list => [$word_hash->[0], $word_hash->[1], $word_hash->[2], \%L_scrap] if $real and scalar keys %L_scrap >= $self->phrase_threshold;
-		}
-
-
 		#compile scraps for scoring
-		 JOIN: for my $fragment (@frag_list) {
+		 JOIN: for my $fragment (@{$self->frag_list}) {
 			my $scrap  = join ' ' => map { $score_hash{$_}++;
 										   $fragment->[-1]->{$_} } sort { $a <=> $b } keys %{$fragment->[-1]};
 			my @bare   = map { $fragment->[-1]->{$_} } grep { !$self->stopwords->{$fragment->[-1]->{$_}} } sort { $a <=> $b } keys %{$fragment->[-1]};
@@ -679,8 +611,8 @@ sub analyze_phrases {
 
 			my $score = 1;
 			for my $word (split ' ' => $scrap) {
-				$score += $freq_hash{$word}  // 0;
-				$score += $sigma_hash{$word} // 0;
+				$score += $self->freq_hash->{$word}  // 0;
+				$score += $self->sigma_hash->{$word} // 0;
 				$score += $score_hash{$word} // 0;
 			}
 
@@ -694,8 +626,8 @@ sub analyze_phrases {
 	for my $scrap (keys %inter_hash) {
 		for my $word (split ' ' => $scrap) {
 			my $score = 1;
-			$score += $freq_hash{$word}  // 0;
-			$score += $sigma_hash{$word} // 0;
+			$score += $self->freq_hash->{$word}  // 0;
+			$score += $self->sigma_hash->{$word} // 0;
 			$score += $score_hash{$word} // 0;
 
 			$inter_hash{$scrap} *= $score;
