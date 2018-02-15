@@ -4,12 +4,12 @@ use v5.10.0;
 use strict;
 use warnings;
 use Moo;
-use Types::Standard qw/ Ref Str Int Num InstanceOf /;
+use Types::Standard qw/ Ref Str Int Num InstanceOf Bool /;
 use List::AllUtils qw/ max min sum sum0 singleton /;
 use Algorithm::CurveFit;
 use utf8;
 
-binmode STDOUT, ":utf8";
+binmode STDOUT, ':encoding(UTF-8)';
 
 use vars qw(@ISA @EXPORT @EXPORT_OK %EXPORT_TAGS $VERSION);
 require Exporter;
@@ -43,6 +43,18 @@ has articles_path => (
 	is => 'rw',
 	isa => Str,
 	default => 'articles/*'
+);
+
+has print_scanner => (
+	is => 'rw',
+	isa => Str,
+	default => 0
+);
+
+has print_summary => (
+	is => 'rw',
+	isa => Str,
+	default => 0
 );
 
 has freq_constant => (
@@ -81,13 +93,13 @@ has watch_count => (
 	default => 0,
 );
 
-has add_words => (
-	is => 'rwp',
+has stopwords => (
+	is => 'lazy',
 	isa => Ref['HASH'],
 );
 
-has stopwords => (
-	is => 'lazy',
+has watchlist => (
+	is => 'rwp',
 	isa => Ref['HASH'],
 );
 
@@ -164,7 +176,25 @@ has return_count => (
 	default => 20,
 );
 
+has summary => (
+	is => 'rwp',
+	isa => Ref['HASH'],
+);
 
+has directory => (
+	is => 'rwp',
+	isa => Str,
+);
+
+has file_name => (
+	is => 'rwp',
+	isa => Str,
+);
+
+has text_hint => (
+	is => 'rwp',
+	isa => Str,
+);
 
 sub _build_stopwords {
 	my $self = shift;
@@ -188,7 +218,7 @@ sub _store_stopwords {
 
 	open( my $stopwords_file, ">>", $self->stopwords_path)
 		or die "Can't open $self->stopwords_file: $!";
-	print $stopwords_file "$_\n" for sort keys %{$self->stopwords};
+	#print $stopwords_file "$_\n" for sort keys %{$self->stopwords};
 	close $stopwords_file;
 
 	return $self;
@@ -197,40 +227,54 @@ sub _store_stopwords {
 
 
 sub scan_text {
-	my ($self, $text) = @_;
+	my ($self, $text, $path) = @_;
 
+	$self->_set_file_name( '' );
+	$self->_set_text_hint( '' );
+
+	if ( ref $text ) {
+		$self->_set_file_name( $path );
+
+		$text = join "\n" => map { $_ } <$text>;
+	}
+
+	$self->_set_text_hint( '"' . substr($text,0,50) . '...' . substr($text,-30) . '"' );
 	$self->tokenize( $text );	#breaks the provided file into sentences and individual words
-
 	$self->develop_stopwords;	#analyzes the frequency and clustering of words within the provided file
-	#$self->_store_stopwords;
+	$self->_store_stopwords;
 
-	return $self->add_words;
+	return $self->watchlist;
 }
 
 sub scan_file {
 	my ($self, $file_path) = @_;
 
-	open( my $file, '<:utf8', $file_path )
+	open( my $file, '<:encoding(UTF-8)', $file_path )
 		or die "Can't open $file_path: $!";
 
-	my $text = join "\n" => map { $_ } <$file>;
-
-	return $self->scan_text($text);
+	return $self->scan_text( $file, $file_path );
 }
 
-sub scan_all {
+sub scan_each {
 	my ($self, $dir_path) = @_;
-
-	return map { $self->scan_file( $_ ) } glob($dir_path // $self->articles_path);
+	return map { $self->scan_file( $_ ) } glob( $dir_path // $self->articles_path );
 }
 
 
 
 sub summarize_text {
-	my ($self, $text) = @_;
+	my ($self, $text, $path) = @_;
 
+	$self->_set_file_name( '' );
+
+	if ( ref $text ) {
+		$self->_set_file_name( $path );
+		
+		$text = join "\n" => map { $_ } <$text>;
+	}
+
+	$self->_set_text_hint( '"' . substr($text,0,50) . '...' . substr($text,-30) . '"' );
 	$self->tokenize($text);		#breaks the provided file into sentences and individual words
-
 	$self->analyze_phrases;		#analyzes the frequency and clustering of words within the provided file
 
 	return $self->summary;
@@ -240,17 +284,15 @@ sub summarize_text {
 sub summarize_file {
 	my ($self, $file_path) = @_;
 
-	open( my $file, '<:utf8', $file_path )
+	open( my $file, '<:encoding(UTF-8)', $file_path )
 		or die "Can't open $file_path: $!";
 
-	my $text = join "\n" => map { $_ } <$file>;
-
-	return $self->summarize_text($text);
+	return $self->summarize_text( $file, $file_path );
 }
 
-sub summarize_all {
+sub summarize_each {
 	my ($self, $dir_path) = @_;
-	return map { $self->summarize_file( $_ ) } glob($dir_path // $self->articles_path);
+	return map { $self->summarize_file( $_ ) } glob( $dir_path // $self->articles_path );
 }
 
 
@@ -512,32 +554,7 @@ sub develop_stopwords {
 	my $upper  = $Q3 + 1.5 * $IQR;
 
 
-
-	say "KNOWN:";
-	KEY: for my $index ( reverse 0..scalar @word_keys - 1 ) {
-		my $format = "%" . $longest . "s|%s\n";
-		my $score = $score_hash{$word_keys[$index]};
-
-		my $score_string = sprintf " %5.2f |" => $score;
-		for (0..max($score, $upper)) {
-			if ($score >= $lower and $score <= $upper) {
-				$score_string .= '+' if $_ <= $score;
-			} else {
-				$score_string .= ']' if $_ == int $upper;
-				$score_string .= '-' if $_ <= int $score;
-				$score_string .= ' ' if $_ >  int $score;
-				$score_string .= '[' if $_ == int $lower;
-			}
-		}
-
-		printf $format => ($word_keys[$index], $score_string);
-	}
-	printf "\nlower = %.2f; mid = %.2f; upper = %.2f\n" => ($lower, $score_ave, $upper);
-	say "\n";
-
-
-
-	my @graph_data = grep { $_ >= $lower and $_ <= $upper } map { $score_hash{$_} } @word_keys;
+	my @graph_data = grep { $_ > $lower and $_ < $upper } map { $score_hash{$_} } @word_keys;
 	my $n = scalar @graph_data;
 
 	if ($n > 4) {
@@ -560,34 +577,55 @@ sub develop_stopwords {
 		);
 		my ($a, $b, $c) = ($params_line[0]->[1],$params_line[1]->[1],$params_line[2]->[1]);
 
-		print "CALCULATED:\n";
+
+		my %watchlist = %{$self->watchlist // {} };
 		KEY: for my $index ( reverse 1..scalar @word_keys ) {
-			my $format = "%" . $longest . "s|%s\n";
-			my $score  = $a + $b * $index + $c * $index**2;
-			my $score_string = sprintf " %5.2f |%s" => $score, ($score >= $lower and $score < $score_hash{$word_keys[$index - 1]} ? '-' x $score : '+' x $score);
-			printf $format => $word_keys[$index - 1], $score_string;
+	 		my $score  = $a + $b * $index + $c * $index**2;
+			$watchlist{$word_keys[$index - 1]}++ if $score >= $lower and $score < $score_hash{$word_keys[$index - 1]};
 		}
-	} else {
-		print "SAMPLE SIZE TOO SMALL FOR ACCURATE BEST-FIT CURVE";
-	}
-	
-	
-	print "\n\n———————————————————————————————————————————\n\n\n";
+		$self->_set_watchlist( \%watchlist );
 
 
-	return $self;
-}
+		if ($self->print_scanner) {
+			say "\n\n———————————————————————————————————————————\n\n";
 
-sub grow_watchlist {
-	my ($self, $file) = @_;
 
-	for (<$file>) {
-		for my $word ( map { /\b (?: \w \. (?: ['’-] \w+ )?)+ | (?: \w+ ['’-]? )+ (?=\s|\b)/gx } lc $_ ) {
-			$self->watchlist->{$word}++ unless ( exists $self->stopwords->{$word} );
+			say "[file name] " . $self->file_name if $self->file_name;
+			say "[text hint] " . $self->text_hint;
+
+			say "\n---SCANNER GRAPHS---\n";
+
+			say "KNOWN:";
+			KEY: for my $index ( reverse 0..scalar @word_keys - 1 ) {
+				my $format = "%" . $longest . "s|%s\n";
+				my $score = $score_hash{$word_keys[$index]};
+
+				my $score_string = sprintf " %5.2f |" => $score;
+				for (0..max($score, $upper)) {
+					if ($score > $lower and $score < $upper) {
+						$score_string .= '+' if $_ <= $score;
+					} else {
+						$score_string .= ']' if $_ == int $upper;
+						$score_string .= '-' if $_ <= int $score;
+						$score_string .= ' ' if $_ >  int $score;
+						$score_string .= '[' if $_ == int $lower;
+					}
+				}
+
+				printf $format => ($word_keys[$index], $score_string);
+			}
+			printf "\n[whiskers] lower = %.2f; upper = %.2f\n\n" => ($lower, $upper);
+
+			say "CALCULATED:";
+			KEY: for my $index ( reverse 1..scalar @word_keys ) {
+				my $format = "%" . $longest . "s|%s\n";
+				my $score  = $a + $b * $index + $c * $index**2;
+				my $score_string = sprintf " %5.2f |%s" => $score, ($score >= $lower and $score < $score_hash{$word_keys[$index - 1]} ? '-' x $score : '+' x $score);
+				printf $format => $word_keys[$index - 1], $score_string;
+			}
 		}
-	}
+	}	
 
-	$self->_set_watch_count( sum values %{$self->watchlist} // 0 );  #counts the total number of watch_words ever collected
 
 	return $self;
 }
@@ -666,18 +704,14 @@ sub analyze_phrases {
 	$self->_set_phrase_list( \%full_phrase );
 
 
-	return $self;
-}
 
 
 
-#returns a summary array for the given text, in the form of a hash of array-refs:
-#	sentences => a list of full sentences from the given article, scored based on the scores of the words contained therein
-#	fragments => a list of phrase fragments from the given article, scored as above
-#	    words => a list of all words in the article, scored by a three-factor system consisting of
-#				(frequency of appearance, population standard deviation, and use in important phrase fragments)
-sub summary {
-	my $self = shift;
+	#returns a summary array for the given text, in the form of a hash of array-refs:
+	#	sentences => a list of full sentences from the given article, scored based on the scores of the words contained therein
+	#	fragments => a list of phrase fragments from the given article, scored as above
+	#	    words => a list of all words in the article, scored by a three-factor system consisting of
+	#				(frequency of appearance, population standard deviation, and use in important phrase fragments)
 
 	my %sort_list;
 	for (keys %{$self->freq_hash}) {
@@ -690,47 +724,54 @@ sub summary {
 	my %fragments = map { ($_ => $self->inter_hash->{$_})  } sort { $self->inter_hash->{$b} <=> $self->inter_hash->{$a} or $a cmp $b } keys %{$self->inter_hash};
 	my %singleton = map { ($_ => $sort_list{$_}) 		   } sort { $sort_list{$b} <=> $sort_list{$a} or $a cmp $b } keys %sort_list;
 
-	return { sentences => \%sentences, fragments => \%fragments, words => \%singleton };
+	my %summary = ( sentences => \%sentences, fragments => \%fragments, words => \%singleton );
+
+	$self->_set_summary( \%summary );
+
+
+	if ($self->print_summary) {
+		say "\n\n———————————————————————————————————————————\n\n";
+
+
+		say "[file name] " . $self->file_name if $self->file_name;
+		say "[text hint] " . $self->text_hint;
+
+		say "\n---SUMMARY CHARTS---\n";
+
+		my ($sentences, $fragments, $words) = @{$self->summary}{'sentences','fragments','words'};
+
+		say "SUMMARY:";
+		my @sentence_keys = sort { $sentences->{$b} <=> $sentences->{$a} or $a cmp $b} keys %$sentences;
+		for my $sen ( @sentence_keys[0..min($self->return_count,scalar @sentence_keys - 1)] ) {
+			printf "%4d => %s\n" => $sentences->{$sen}, $sen;
+		}
+		say "\n";
+
+
+		say "PHRASES:";
+		my @phrase_keys = sort { $fragments->{$b} <=> $fragments->{$a} or $a cmp $b } keys %$fragments;
+		for my $phrase ( @phrase_keys[0..min($self->return_count,scalar @phrase_keys - 1)] ) {
+			printf "%8d => %s\n" => $fragments->{$phrase}, $phrase;
+		} 
+		say "\n";
+
+
+		say "  WORDS:";
+		my @word_keys = sort { $words->{$b} <=> $words->{$a} or $a cmp $b } keys %$words;
+		my $highest = $words->{$word_keys[0]};
+		my $longest = max map {length} @word_keys;
+		KEY: for my $word ( @word_keys[0..min($self->return_count,scalar @word_keys - 1)] ) {
+			my $format = "%" . $longest . "s|%s\n";
+			my $score = int(40*$words->{$word}/$highest);
+			printf $format => ( $word , "-" x $score ) if $score > 2;
+		}
+		say "\n";
+	}
+
+
+	return $self;
 }
 
-
-
-sub pretty_print {
-	my ($self, $summary, $return_count) = @_;
-	my ($sentences, $fragments, $words) = @{$summary}{'sentences','fragments','words'};
-
-	$return_count ||= 20;
-
-	say "SUMMARY:";
-	my @sentence_keys = sort { $sentences->{$b} <=> $sentences->{$a} or $a cmp $b} keys %$sentences;
-	for my $sen ( @sentence_keys[0..min($return_count,scalar @sentence_keys - 1)] ) {
-		printf "%4d => %s\n" => $sentences->{$sen}, $sen;
-	}
-	say "\n";
-
-
-	say "PHRASES:";
-	my @phrase_keys = sort { $fragments->{$b} <=> $fragments->{$a} or $a cmp $b } keys %$fragments;
-	for my $phrase ( @phrase_keys[0..min($return_count,scalar @phrase_keys - 1)] ) {
-		printf "%8d => %s\n" => $fragments->{$phrase}, $phrase;
-	} 
-	say "\n";
-
-
-	say "  WORDS:";
-	my @word_keys = sort { $words->{$b} <=> $words->{$a} or $a cmp $b } keys %$words;
-	my $highest = $words->{$word_keys[0]};
-	my $longest = max map {length} @word_keys;
-	KEY: for my $word ( @word_keys[0..min($return_count,scalar @word_keys - 1)] ) {
-		my $format = "%" . $longest . "s|%s\n";
-		my $score = int(40*$words->{$word}/$highest);
-		printf $format => ( $word , "-" x $score ) if $score > 2;
-	}
-	say "\n";
-
-
-	return $summary;
-}
 
 
 

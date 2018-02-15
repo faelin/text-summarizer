@@ -2,50 +2,23 @@
 use lib 'lib';
 use Text::Summarizer;
 
-my $summarizer = Text::Summarizer->new(articles_path => "articles/*");
+my $summarizer = Text::Summarizer->new( articles_path => "articles/*", print_summary => 1, print_scanner => 1, );
 
-my $new_words = $summarizer->scan_all();
+my $sample_text = <<'END_SAMPLE';
+	Avram Noam Chomsky, born December 7, 1928) is an American linguist, cognitive scientist, historian, social critic, and political activist. Sometimes described as "the father of modern linguistics," Chomsky is also one of the founders of the field of cognitive science. He is the author of over 100 books on topics such as linguistics, war, politics, and mass media. Ideologically, he aligns with anarcho-syndicalism and libertarian socialism. He holds a joint appointment as Institute Professor Emeritus at the Massachusetts Institute of Technology (MIT) and laureate professor at the University of Arizona.[22][23]
 
-my @summaries = $summarizer->summarize_all();
-my $file_summ = $summarizer->summarize_file("articles/17900108-Washington.txt");
-my $text_summ = $summarizer->summarize_text(<<'END_SAMPLE');
+	Born to middle-class Ashkenazi Jewish immigrants in Philadelphia, Chomsky developed an early interest in anarchism from alternative bookstores in New York City. At the age of 16 he began studies at the University of Pennsylvania, taking courses in linguistics, mathematics, and philosophy. From 1951 to 1955 he was appointed to Harvard University's Society of Fellows, where he developed the theory of transformational grammar for which he was awarded his doctorate in 1955. That year he began teaching at MIT, in 1957 emerging as a significant figure in the field of linguistics for his landmark work Syntactic Structures, which remodeled the scientific study of language, while from 1958 to 1959 he was a National Science Foundation fellow at the Institute for Advanced Study. He is credited as the creator or co-creator of the universal grammar theory, the generative grammar theory, the Chomsky hierarchy, and the minimalist program. Chomsky also played a pivotal role in the decline of behaviorism, being particularly critical of the work of B. F. Skinner.
 
-	YOU don’t know about me without you have read a book by the name of The Adventures of Tom Sawyer; 
-	but that ain’t no matter. That book was made by Mr. Mark Twain, and he told the truth, mainly. There 
-	was things which he stretched, but mainly he told the truth. That is nothing. I never seen anybody 
-	but lied one time or another, without it was Aunt Polly, or the widow, or maybe Mary. Aunt 
-	Polly—Tom’s Aunt Polly, she is—and Mary, and the Widow Douglas is all told about in that book, 
-	which is mostly a true book, with some stretchers, as I said before. Now the way that the book winds 
-	up is this: Tom and me found the money that the robbers hid in the cave, and it made us rich. We got 
-	six thousand dollars apiece—all gold. It was an awful sight of money when it was piled up. Well, 
-	Judge Thatcher he took it and put it out at interest, and it fetched us a dollar a day apiece all 
-	the year round—more than a body could tell what to do with. The Widow Douglas she took me for her 
-	son, and allowed she would sivilize me; but it was rough living in the house all the time, 
-	considering how dismal regular and decent the widow was in all her ways; and so when I couldn’t 
-	stand it no longer I lit out. I got into my old rags and my sugar-hogshead again, and was free and 
-	satisfied. But Tom Sawyer he hunted me up and said he was going to start a band of robbers, and I 
-	might join if I would go back to the widow and be respectable. So I went back. The widow she cried 
-	over me, and called me a poor lost lamb, and she called me a lot of other names, too, but she never 
-	meant no harm by it. She put me in them new clothes again, and I couldn’t do nothing but sweat and 
-	sweat, and feel all cramped up.
+	An outspoken opponent of U.S. involvement in the Vietnam War, which he saw as an act of American imperialism, in 1967 Chomsky attracted widespread public attention for his anti-war essay "The Responsibility of Intellectuals". Associated with the New Left, he was arrested multiple times for his activism and placed on President Richard Nixon's Enemies List. While expanding his work in linguistics over subsequent decades, he also became involved in the Linguistics Wars. In collaboration with Edward S. Herman, Chomsky later co-wrote an analysis articulating the propaganda model of media criticism, and worked to expose the Indonesian occupation of East Timor. Additionally, his defense of unconditional freedom of speech – including for Holocaust deniers – generated significant controversy in the Faurisson affair of the early 1980s. Following his retirement from active teaching, he has continued his vocal political activism, including opposing the War on Terror and supporting the Occupy movement.
+
+	One of the most cited scholars in history, Chomsky has influenced a broad array of academic fields. He is widely recognized as a paradigm shifter who helped spark a major revolution in the human sciences, contributing to the development of a new cognitivistic framework for the study of language and the mind. In addition to his continued scholarly research, he remains a leading critic of U.S. foreign policy, neoliberalism and contemporary state capitalism, the Israeli–Palestinian conflict, and mainstream news media. His ideas have proved highly significant within the anti-capitalist and anti-imperialist movements. Some of his critics have accused him of anti-Americanism.
 END_SAMPLE
 
+my $text_summ = $summarizer->scan_text($sample_text);
+my $text_summ = $summarizer->summarize_text($sample_text);
 
-#$summarizer->pretty_print($file_summ, 50);
+my $file_summ = $summarizer->scan_file("articles/17900108-Washington.txt");
+my $file_summ = $summarizer->summarize_file("articles/17900108-Washington.txt");
 
-#$summarizer->pretty_print($_) for @summaries;
-
-
-# open( my $file, '>>', sprintf( "data/phrases.csv", $i) )
-# 		or die "Can't open data/phrases.csv: $!";
-
-# my $phrases = $summarizer->phrase_list;
-# my @phrase_list = sort { $phrases->{$b} <=> $phrases->{$a} } keys %$phrases;
-# my $highest = $phrase_list[0];
-# for my $sen ( sort { $phrases->{$b} <=> $phrases->{$a} } keys %$phrases ) {
-# 	my $phrase = join ' ' => split /[^A-Za-z0-9-']+/ => $sen;
-# 	my $score = $phrases->{$sen} / $phrases->{$highest};
-# 	# print $file "$phrase,$score\n";
-# }
-
-# close $file;
+my $new_words = $summarizer->scan_each();
+my @summaries = $summarizer->summarize_each("articles/*");
