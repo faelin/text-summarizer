@@ -15,10 +15,10 @@ my $sample_text = <<'END_SAMPLE';
 END_SAMPLE
 
 my $text_words = $summarizer->scan_text($sample_text);
-my $text_summs = $summarizer->summarize_text($sample_text);
+my $text_summs = $summarizer->summ_text($sample_text);
 
 my $file_words = $summarizer->scan_file("articles/17900108-Washington.txt");
-my $file_summs = $summarizer->summarize_file("articles/17900108-Washington.txt");
+my $file_summs = $summarizer->summ_file("articles/17900108-Washington.txt");
 
 my @each_words = $summarizer->scan_each();
-my @each_summs = $summarizer->summarize_each("articles/*");
+my @each_summs = $summarizer->summ_each("articles/*");

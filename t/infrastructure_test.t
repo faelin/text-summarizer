@@ -57,13 +57,13 @@ my $some_text = <<'END_SAMPLE';
 END_SAMPLE
 
 
-my @each_summ = $summarizer->summarize_each();
-my $file_summ = $summarizer->summarize_file("articles/17900108-Washington.txt");
-my $text_summ = $summarizer->summarize_text($some_text);
+my @each_summ = $summarizer->summ_each();
+my $file_summ = $summarizer->summ_file("articles/17900108-Washington.txt");
+my $text_summ = $summarizer->summ_text($some_text);
 
-subtest 'Summarize Each - Structure Intact' => sub { summary_test(@each_summ) };
-subtest 'Summarize File - Structure Intact' => sub { summary_test($file_summ) };
-subtest 'Summarize Text - Structure Intact' => sub { summary_test($text_summ) };
+subtest 'Summ Each - Structure Intact' => sub { summary_test(@each_summ) };
+subtest 'Summ File - Structure Intact' => sub { summary_test($file_summ) };
+subtest 'Summ Text - Structure Intact' => sub { summary_test($text_summ) };
 
 my @each_scan = $summarizer->scan_each();
 my $file_scan = $summarizer->scan_file("articles/17900108-Washington.txt");

@@ -6,14 +6,22 @@ Text::Summarizer - Summarize Bodies of Text
 
 # SYNOPSIS
 	use Text::Summarizer;
-
-	my $summarizer = Text::Summarizer->new( print_scanner => 1, print_summary => 1 );
 	
-	my $new_words = $summarizer->scan_file("some/file.txt");
-	my $summary   = $summarizer->summarize_file("some/file.txt");
-		# or if you want to process in bulk
-	my @new_words = $summarizer->scan_each("/directory/glob/*");
-	my @summaries = $summarizer->summarize_each("/directory/glob/*");
+	my $summarizer = Text::Summarizer->new(
+							print_scanner => 1,
+							print_summary => 1,
+							store_scanner => 1,
+						);
+	
+		# to summarize a string
+	$new_words = $summarizer->scan_text( 'this is a sample text' );
+	$summary   = $summarizer->summ_text( 'this is a sample text' );
+	    # or to summarize an entire file
+	$new_words = $summarizer->scan_file("some/file.txt");
+	$summary   = $summarizer->summ_file("some/file.txt");
+		# or to summarize in bulk
+	@new_words = $summarizer->scan_each("/directory/glob/*");
+	@summaries = $summarizer->summ_each("/directory/glob/*");
 
 
 
@@ -60,18 +68,22 @@ This module allows you to summarize bodies of text into a scored hash of  _sente
 ## scan
 Scan is a utility that allows the Text::Summarizer to parse through a body of text to find words that occur with unusually high frequency. These words are then stored as new stopwords via the provided `stopwords_path`. Additionally, calling any of the three `scan_[...]` subroutines will return a reference (or array of references) to an unordered list containing the new stopwords.
 
-	$new_words     = $summarizer->scan_text( 'this is a sample text' )
+	$new_words     = $summarizer->scan_text( 'this is a sample text' );
 	$new_words     = $summarizer->scan_file( 'some/file/path.txt' );
 	@arr_new_words = $summarizer->scan_each( 'some/directory/*' );
 
 ## summarize
 Summarizing is, not surprisingly, the heart of the Text::Summarizer. Summarizing a body of text provides three distinct categories of information drawn from the existing text and ordered by relevance to the summary: full sentences, phrase-fragments / context-free token streams, and a list of frequently occuring words.
 
-There are three provided functions for summarizing text documents.
+There are three provided functions for summarizing text documents:
 
-	$summary   = $summarizer->summarize_text( 'this is a sample text' )
+	$summary   = $summarizer->summarize_text( 'this is a sample text' );
 	$summary   = $summarizer->summarize_file( 'some/file/path.txt' );
 	@summaries = $summarizer->summarize_each( 'some/directory/*' );
+		# or their short forms
+	$summary   = $summarizer->summ_text('...');
+	$summary   = $summarizer->summ_file('...');
+	@sumamries = $summarizer->summ_each('...');
 
 `summarize_text` and `summarize_file` each return a summary hash-ref containing three array-refs, while `summarize_each` returns a list of these hash-refs. These summary hashes take the following form:
 - `sentences` => a list of full sentences from the given text, with composite scores of the words contained therein
