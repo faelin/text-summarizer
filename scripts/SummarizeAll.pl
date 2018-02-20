@@ -2,7 +2,7 @@
 use lib 'lib';
 use Text::Summarizer;
 
-my $summarizer = Text::Summarizer->new( articles_path => "articles/*", print_summary => 1, print_scanner => 1, );
+my $summarizer = Text::Summarizer->new( print_scanner => 1, print_summary => 1);
 
 my $sample_text = <<'END_SAMPLE';
 	Avram Noam Chomsky, born December 7, 1928) is an American linguist, cognitive scientist, historian, social critic, and political activist. Sometimes described as "the father of modern linguistics," Chomsky is also one of the founders of the field of cognitive science. He is the author of over 100 books on topics such as linguistics, war, politics, and mass media. Ideologically, he aligns with anarcho-syndicalism and libertarian socialism. He holds a joint appointment as Institute Professor Emeritus at the Massachusetts Institute of Technology (MIT) and laureate professor at the University of Arizona.[22][23]
@@ -14,11 +14,11 @@ my $sample_text = <<'END_SAMPLE';
 	One of the most cited scholars in history, Chomsky has influenced a broad array of academic fields. He is widely recognized as a paradigm shifter who helped spark a major revolution in the human sciences, contributing to the development of a new cognitivistic framework for the study of language and the mind. In addition to his continued scholarly research, he remains a leading critic of U.S. foreign policy, neoliberalism and contemporary state capitalism, the Israeli–Palestinian conflict, and mainstream news media. His ideas have proved highly significant within the anti-capitalist and anti-imperialist movements. Some of his critics have accused him of anti-Americanism.
 END_SAMPLE
 
-my $text_summ = $summarizer->scan_text($sample_text);
-my $text_summ = $summarizer->summarize_text($sample_text);
+my $text_words = $summarizer->scan_text($sample_text);
+my $text_summs = $summarizer->summarize_text($sample_text);
 
-my $file_summ = $summarizer->scan_file("articles/17900108-Washington.txt");
-my $file_summ = $summarizer->summarize_file("articles/17900108-Washington.txt");
+my $file_words = $summarizer->scan_file("articles/17900108-Washington.txt");
+my $file_summs = $summarizer->summarize_file("articles/17900108-Washington.txt");
 
-my $new_words = $summarizer->scan_each();
-my @summaries = $summarizer->summarize_each("articles/*");
+my @each_words = $summarizer->scan_each();
+my @each_summs = $summarizer->summarize_each("articles/*");

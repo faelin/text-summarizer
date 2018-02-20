@@ -14,7 +14,6 @@ subtest 'Datafile Attributes Set' => sub {
 	my $paths = ['data/permanent.stop','data/stopwords.stop','data/watchlist.stop'];
 	is $summarizer->permanent_path, $paths->[0] => "permanent path is '$paths->[0]'";
 	is $summarizer->stopwords_path, $paths->[1] => "stopwords path is '$paths->[1]'";
-	is $summarizer->watchlist_path, $paths->[2] => "watchlist path is '$paths->[2]'";
 };
 
 
@@ -28,11 +27,9 @@ sub summary_test {
 		 ok all_u( sub { all_u( sub { $_ > 0 } => values %{$_->{fragments}} ) } => @summaries ), 'all fragments scored';
 		 ok all_u( sub { all_u( sub { $_ > 0 } => values %{$_->{  words  }} ) } => @summaries ), 'all words are scored';
 
-		 ok all_u( sub { all_u( sub { /(?<!\s[A-Z][a-z]) (?<!\s[A-Z][a-z]{2}) \. (?![A-Z]\.|\s[a-z0-9]) | \! | \? | \b$/x } => keys %{$_->{sentences}} ) } => @summaries ), 'sentences look sentency';
+		 ok all_u( sub { all_u( sub { /(?<!\s[A-Z][a-z]) (?<!\s[A-Z][a-z]{2}) \. (?![A-Z]\.|\s[a-z0-9]) | \! | \? | : | \b\Z/x } => keys %{$_->{sentences}} ) } => @summaries ), 'sentences look sentency';
 		 ok all_u( sub { all_u( sub { /(?: \( [\w'’-]+ (?: \| [\w'’-]+ )*  \) ) | (?: [\w'’-]+ (?: \s [\w'’-]+ )* )/x } => keys %{$_->{fragments}} ) } => @summaries ), 'fragments look fragmenty';
 		 ok all_u( sub { all_u( sub { /[\w'’-]+/x } => keys %{$_->{  words  }} ) } => @summaries ), 'all words look like words';
-	} else {
-		fail 'summaries not in hash form';
 	}
 }
 
