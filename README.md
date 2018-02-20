@@ -2,10 +2,12 @@
 
 Text::Summarizer - Summarize Bodies of Text
 
+
+
 # SYNOPSIS
 
 	use Text::Summarizer;
-	
+
 	my $summarizer = Text::Summarizer->new( print_scanner => 1, print_summary => 1 );
 	
 	my $new_words = $summarizer->scan_file("articles/article00.txt");
@@ -14,8 +16,12 @@ Text::Summarizer - Summarize Bodies of Text
 	my @new_words = $summarizer->scan_each("articles/*");
 	my @summaries = $summarizer->summarize_each("articles/*");
 
+
+
 # DESCRIPTION
 This module allows you to summarize bodies of text into a scored hash of  _sentences_,  _phrase-fragments_, and  _individual words_ from the provided text. These scores reflect the weight (or precedence) of the relative text-fragments, i.e. how well they summarize or reflect the overall nature of the text. All of the sentences and phrase-fragments are drawn from within the existing text, and are NOT proceedurally generated.
+
+
 
 # ATTRIBUTES
 **The following constructor attributes are available to the user, and can be accessed/modified at any time via `$summarizer->[attribute]`:**
@@ -36,22 +42,30 @@ This module allows you to summarize bodies of text into a scored hash of  _sente
 * `sen_words` - [array-ref] list that, for each sentence, contains an array of each word in order
 * `word_list` - [array-ref] each individual word of the entire text, in order (token stream)
 
+
 * `freq_hash` - [hash-ref] all words that occur more than a specified threshold, paired with their frequency of occurence
 * `clst_hash` - [hash-ref] for each word in the text, specifies the position of each occurence of the word, both relative to the sentence it occurs in and absolute within the text
 * `phrs_hash` - [hash-ref] for each word in the text, contains a phrase of radius _r_ centered around the given word, and references the sentence from which the phrase was gathered
 
+
 * `sigma_hash` - [hash-ref] gives the population standard deviation of the clustering of each word in the text
+
 
 * `inter_hash` - [hash-ref] list of each chosen phrase-fragment-scrap, paired with its score
 * `score_hash` - [hash-ref] list of each word in the text, paired with its score
 * `phrs_list`  - [hash-ref] list of complete sentences that each scrap was drawn from, paired with its score
-* 
+
+
 * `frag_list`  - [array-ref] for each chosen scrap, contains a hash of: the pivot word of the scrap; the sentence containing the scrap; the number of occurences of each word in the sentence; an ordered list of the words in the phrase from which the scrap was derived
+
 
 * `file_name` - [string] the filename of the current text-source (if text was extracted from a file)
 * `text_hint` - [string] brief snippet of text containing the first 50 and the final 30 characters of the current text
 
+
 * `summary` - [hash-ref] scored lists of each summary sentence, each chosen scrap, and each frequently-occuring word
+
+
 
 # FUNCTIONS
 ## scan
@@ -77,6 +91,7 @@ There are three provided functions for summarizing text documents.
 
 - **words**     => a list of all words in the text, scored by a three-factor system consisting of  _frequency of appearance_,  _population standard deviation_, and  _use in important phrase fragments_.
 
+
 ### About Fragments
 Phrase fragments are in actuallity short "scraps" of text (usually only two or three words) that are derived from the text via the following process:
 1. the entirety of the text is tokenized and scored into a `frequency` table, with a high-pass threshold of frequencies above `# of tokens * user-defined scaling factor`
@@ -88,6 +103,8 @@ Phrase fragments are in actuallity short "scraps" of text (usually only two or t
 6. when a shorter fragment-scrap (_A_) is included in the text of a longer scrap (_B_) such that _A_ ⊂ _B_, the shorter is deleted and its score is added to that of the longer
 7. when multiple fragments are equivalent (i.e. they consist of the same list of tokens when stopwords are excluded), they are condensed into a single scrap in the form of `"(some|word|tokens)"` such that the fragment now represents the tokens of the scrap (excluding stopwords) regardless of order (refered to as a "context-free token stream")
 
+
+
 # SUPPORT
 
 Bugs should always be submitted via the project hosting bug tracker
@@ -96,13 +113,19 @@ https://github.com/faelin/text-summarizer/issues
 
 For other issues, contact the maintainer.
 
+
+
 # AUTHOR
 
 Faelin Landy <faelin.landy@gmail.com> (current maintainer)
 
+
+
 # CONTRIBUTORS
 
 * Michael McClennen <michaelm@umich.edu>
+
+
 
 # COPYRIGHT AND LICENSE
 
