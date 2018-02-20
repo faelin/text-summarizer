@@ -791,23 +791,41 @@ B< The following constructor attributes are available to the user, and can be ac
 
 =over 8
 
-=item C<permanent_path>  – [filepath] file containing a base set of universal stopwords (defaults to English stopwords)
+=item C<permanent_path>  – [filepath]
 
-=item C<stopwords_path>  – [filepath] file containing a list of new stopwords identified by the C<< scan >> function
+file containing a base set of universal stopwords (defaults to English stopwords)
 
-=item C<articles_path>   – [directory] folder containing some text-files you wish to summarize
+=item C<stopwords_path>  – [filepath]
 
-=item C<print_scanner>   – [boolean] flag that enables visual graphing of scanner activity (prints to C<STDOUT>)
+file containing a list of new stopwords identified by the C<< scan >> function
 
-=item C<print_summary>   – [boolean] flag that enables visual charting of summary activity (prints to C<STDOUT>)
+=item C<articles_path>   – [directory]
 
-=item C<return_count>    – [int] number of items to list when printing summary list
+folder containing some text-files you wish to summarize
 
-=item C<phrase_thresh>   – [int] minimum number of word tokens allowed in a phrase
+=item C<print_scanner>   – [boolean]
 
-=item C<phrase_radius>   – [int] distance iterated backward and forward from a given word when establishing a phrase (i.e. maximum length of phrase divided by 2)
+flag that enables visual graphing of scanner activity (prints to C<STDOUT>)
 
-=item C<freq_constant>   – [float] mathematical constant for establishing minimum threshold of occurence for frequently occuring words (defaults to C<< 0.004 >>)
+=item C<print_summary>   – [boolean]
+
+flag that enables visual charting of summary activity (prints to C<STDOUT>)
+
+=item C<return_count>    – [int]
+
+number of items to list when printing summary list
+
+=item C<phrase_thresh>   – [int]
+
+minimum number of word tokens allowed in a phrase
+
+=item C<phrase_radius>   – [int]
+
+distance iterated backward and forward from a given word when establishing a phrase (i.e. maximum length of phrase divided by 2)
+
+=item C<freq_constant>   – [float]
+
+mathematical constant for establishing minimum threshold of occurence for frequently occuring words (defaults to C<< 0.004 >>)
 
 =back
 
@@ -816,40 +834,65 @@ B< These attributes are read-only, and can be accessed via C<< $summarizer->[att
 
 =over 8
 
-=item C<full_text> – [string] all the lines of the provided text, joined together
+=item C<full_text> – [string]
 
-=item C<sentences> – [array-ref] list of each sentence found in the provided text
+all the lines of the provided text, joined together
 
-=item C<sen_words> – [array-ref] for each sentence, contains an array of each word in order
+=item C<sentences> – [array-ref]
 
-=item C<word_list> – [array-ref] each individual word of the entire text, in order (token stream)
+list of each sentence found in the provided text
 
+=item C<sen_words> – [array-ref]
 
-=item C<freq_hash> – [hash-ref] all words that occur more than a specified threshold, paired with their frequency of occurence
+for each sentence, contains an array of each word in order
 
-=item C<clst_hash> – [hash-ref] for each word in the text, specifies the position of each occurence of the word, both relative to the sentence it occurs in and absolute within the text
+=item C<word_list> – [array-ref]
 
-=item C<phrs_hash> – [hash-ref] for each word in the text, contains a phrase of radius I<r> centered around the given word, and references the sentence from which the phrase was gathered
+each individual word of the entire text, in order (token stream)
 
+=item C<freq_hash> – [hash-ref]
 
-=item C<sigma_hash> – [hash-ref] gives the population standard deviation of the clustering of each word in the text
+all words that occur more than a specified threshold, paired with their frequency of occurence
 
+=item C<clst_hash> – [hash-ref]
 
-=item C<inter_hash> – [hash-ref] list of each chosen phrase-fragment-scrap, paired with its score
+for each word in the text, specifies the position of each occurence of the word, both relative to the sentence it occurs in and absolute within the text
 
-=item C<score_hash> – [hash-ref] list of each word in the text, paired with its score
+=item C<phrs_hash> – [hash-ref]
 
-=item C<phrs_list>  – [hash-ref] list of complete sentences that each scrap was drawn from, paired with its score
+for each word in the text, contains a phrase of radius I<r> centered around the given word, and references the sentence from which the phrase was gathered
 
+=item C<sigma_hash> – [hash-ref]
 
-=item C<frag_list>  – [array-ref] for each chosen scrap, contains a hash of: the pivot word of the scrap; the sentence containing the scrap; the number of occurences of each word in the sentence; an ordered list of the words in the phrase from which the scrap was derived
+gives the population standard deviation of the clustering of each word in the text
 
-=item C<file_name> – [string] the filename of the current text-source (if text was extracted from a file)
+=item C<inter_hash> – [hash-ref]
 
-=item C<text_hint> – [string] brief snippet of text containing the first 50 and the final 30 characters of the current text
+list of each chosen phrase-fragment-scrap, paired with its score
 
+=item C<score_hash> – [hash-ref]
 
-=item C<summary> – [hash-ref] scored lists of each summary sentence, each chosen scrap, and each frequently-occuring word
+list of each word in the text, paired with its score
+
+=item C<phrs_list>  – [hash-ref]
+
+list of complete sentences that each scrap was drawn from, paired with its score
+
+=item C<frag_list>  – [array-ref]
+
+for each chosen scrap, contains a hash of: the pivot word of the scrap; the sentence containing the scrap; the number of occurences of each word in the sentence; an ordered list of the words in the phrase from which the scrap was derived
+
+=item C<file_name> – [string]
+
+the filename of the current text-source (if text was extracted from a file)
+
+=item C<text_hint> – [string]
+
+brief snippet of text containing the first 50 and the final 30 characters of the current text
+
+=item C<summary> – [hash-ref]
+
+scored lists of each summary sentence, each chosen scrap, and each frequently-occuring word
 
 =back
 
@@ -878,11 +921,17 @@ C<< summarize_text >> and C<< summarize_file >> each return a summary hash-ref c
 
 =over 8
 
-=item C<B<sentences>> => a list of full sentences from the given text, with composite scores of the words contained therein
+=item *
 
-=item C<B<fragments>> => a list of phrase fragments from the given text, scored similarly to sentences
+C<B<sentences>> => a list of full sentences from the given text, with composite scores of the words contained therein
 
-=item C<B<words>>     => a list of all words in the text, scored by a three-factor system consisting of  I<frequency of appearance>,  I<population standard deviation>, and  I<use in important phrase fragments>.
+=item *
+
+C<B<fragments>> => a list of phrase fragments from the given text, scored similarly to sentences
+
+=item *
+
+C<B<words>>     => a list of all words in the text, scored by a three-factor system consisting of  I<frequency of appearance>,  I<population standard deviation>, and  I<use in important phrase fragments>.
 
 =back
 
@@ -892,19 +941,33 @@ Phrase fragments are in actuality short "scraps" of text (usually only two or th
 
 =over 8
 
-=item 1. the entirety of the text is tokenized and scored into a C<< frequency >> table, with a high-pass threshold of frequencies above C<< # of tokens * user-defined scaling factor >>
+=item 1
 
-=item 2. each sentence is tokenized and stored in an array
+the entirety of the text is tokenized and scored into a C<< frequency >> table, with a high-pass threshold of frequencies above C<< # of tokens * user-defined scaling factor >>
 
-=item 3. for each word within the C<< frequency >> table, a table of phrase-fragments is derived by finding each occurance of said word and tracking forward and backward by a user-defined "radius" of tokens (defaults to S<C<< radius = 5 >>>, does not include the central key-word) — each phrase-fragment is thus compiled of (by default) an 11-token string
+=item 2
 
-=item 4. all fragments for a given key-word are then compared to each other, and each word is deleted if it appears only once amongst all of the fragments (leaving only C<< I<A> ∪ I<B> ∪ ... ∪ I<S> >> where I<A>, I<B>, ..., I<S> are the phrase-fragments)
+each sentence is tokenized and stored in an array
 
-=item 5. what remains of each fragment is a list of "scraps" — strings of consecutive tokens — from which the longest scrap is chosen as a representation of the given phrase-fragment
+=item 3
 
-=item 6. when a shorter fragment-scrap (C<I<A>>) is included in the text of a longer scrap (C<I<B>>) such that C<< I<A> ⊂ I<B> >>, the shorter is deleted and its score is added to that of the longer
+for each word within the C<< frequency >> table, a table of phrase-fragments is derived by finding each occurance of said word and tracking forward and backward by a user-defined "radius" of tokens (defaults to S<C<< radius = 5 >>>, does not include the central key-word) — each phrase-fragment is thus compiled of (by default) an 11-token string
 
-=item 7. when multiple fragments are equivalent (i.e. they consist of the same list of tokens when stopwords are excluded), they are condensed into a single scrap in the form of C<< "(some|word|tokens)" >> such that the fragment now represents the tokens of the scrap (excluding stopwords) regardless of order (refered to as a "context-free token stream")
+=item 4
+
+all fragments for a given key-word are then compared to each other, and each word is deleted if it appears only once amongst all of the fragments (leaving only C<< I<A> ∪ I<B> ∪ ... ∪ I<S> >> where I<A>, I<B>, ..., I<S> are the phrase-fragments)
+
+=item 5
+
+what remains of each fragment is a list of "scraps" — strings of consecutive tokens — from which the longest scrap is chosen as a representation of the given phrase-fragment
+
+=item 6
+
+when a shorter fragment-scrap (C<I<A>>) is included in the text of a longer scrap (C<I<B>>) such that C<< I<A> ⊂ I<B> >>, the shorter is deleted and its score is added to that of the longer
+
+=item 7
+
+when multiple fragments are equivalent (i.e. they consist of the same list of tokens when stopwords are excluded), they are condensed into a single scrap in the form of C<< "(some|word|tokens)" >> such that the fragment now represents the tokens of the scrap (excluding stopwords) regardless of order (refered to as a "context-free token stream")
 
 =back
 
