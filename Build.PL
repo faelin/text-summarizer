@@ -11,9 +11,10 @@ my $builder = Module::Build->new(
     build_requires => {
     },
     requires => {
-        'Moo'               => '2.003002',
-        'Types::Standard'   => 0,
-        'List::AllUtils'    => 0,
+        'Moo'                 => 0,
+        'Types::Standard'     => 0,
+        'List::AllUtils'      => 0,
+        'Algorithm::CurveFit' => 0,
     },
     add_to_cleanup      => [ 'Text::Summarizer-*' ],
     create_makefile_pl => 'traditional',

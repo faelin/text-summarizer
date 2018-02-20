@@ -28,23 +28,23 @@ This module allows you to summarize bodies of text into a scored hash of  I<sent
 
 =over 8
 
-=item B<C<permanent_path>>  – [filepath] file containing a base set of universal stopwords (defaults to English stopwords)
+=item C<permanent_path>  – [filepath] file containing a base set of universal stopwords (defaults to English stopwords)
 
-=item B<C<stopwords_path>>  – [filepath] file containing a list of new stopwords identified by the C<< scan >> function
+=item C<stopwords_path>  – [filepath] file containing a list of new stopwords identified by the C<< scan >> function
 
-=item B<C<articles_path>>   – [directory] folder containing some text-files you wish to summarize
+=item C<articles_path>   – [directory] folder containing some text-files you wish to summarize
 
-=item B<C<print_scanner>>   – [boolean] flag that enables visual graphing of scanner activity (prints to C<STDOUT>)
+=item C<print_scanner>   – [boolean] flag that enables visual graphing of scanner activity (prints to C<STDOUT>)
 
-=item B<C<print_summary>>   – [boolean] flag that enables visual charting of summary activity (prints to C<STDOUT>)
+=item C<print_summary>   – [boolean] flag that enables visual charting of summary activity (prints to C<STDOUT>)
 
-=item B<C<return_count>>    – [int] number of items to list when printing summary list
+=item C<return_count>    – [int] number of items to list when printing summary list
 
-=item B<C<phrase_thresh>>   – [int] minimum number of word tokens allowed in a phrase
+=item C<phrase_thresh>   – [int] minimum number of word tokens allowed in a phrase
 
-=item B<C<phrase_radius>>   – [int] distance iterated backward and forward from a given word when establishing a phrase (i.e. maximum length of phrase divided by 2)
+=item C<phrase_radius>   – [int] distance iterated backward and forward from a given word when establishing a phrase (i.e. maximum length of phrase divided by 2)
 
-=item B<C<freq_constant>>   – [float] mathematical constant for establishing minimum threshold of occurence for frequently occuring words (defaults to C<< 0.004 >>)
+=item C<freq_constant>   – [float] mathematical constant for establishing minimum threshold of occurence for frequently occuring words (defaults to C<< 0.004 >>)
 
 =back
 

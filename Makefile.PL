@@ -4,13 +4,13 @@ WriteMakefile
 (
   'PL_FILES' => {},
   'VERSION_FROM' => 'lib/Text/Summarizer.pm',
-  'INSTALLDIRS' => 'site',
   'PREREQ_PM' => {
                    'Moo' => '2.003002',
-                   'List::AllUtils' => 0,
-                   'Types::Standard' => 0
+                   'Types::Standard' => 0,
+                   'List::AllUtils' => 0
                  },
   'EXE_FILES' => [],
-  'NAME' => 'Text::Summarizer'
+  'NAME' => 'Text::Summarizer',
+  'INSTALLDIRS' => 'site'
 )
 ;

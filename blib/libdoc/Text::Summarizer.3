@@ -129,7 +129,7 @@
 .\" ========================================================================
 .\"
 .IX Title "Text::Summarizer 3"
-.TH Text::Summarizer 3 "2018-01-28" "perl v5.24.0" "User Contributed Perl Documentation"
+.TH Text::Summarizer 3 "2018-02-20" "perl v5.24.0" "User Contributed Perl Documentation"
 .\" For nroff, turn off justification.  Always turn off hyphenation; it makes
 .\" way too many mistakes in technical documents.
 .if n .ad l
@@ -141,62 +141,180 @@ Text::Summarizer \- Summarize Bodies of Text
 .Vb 1
 \&        use Text::Summarizer;
 \&        
-\&        my $summarizer = Text::Summarizer\->new( articles_path => "articles/*" );
+\&        my $summarizer = Text::Summarizer\->new( print_scanner => 1, print_summary => 1 );
 \&        
-\&        my $summary   = $summarizer\->summarize_file("articles/article00.txt");
-\&                #or if you want to process in bulk
-\&        my @summaries = $summarizer\->summarize_all("articles/*");
-\&        
-\&        $summarizer\->pretty_print($summary, 50);
-\&        $summarizer\->pretty_print($_) for (@summaries);
+\&        my $new_words = $summarizer\->scan_file("some/file.txt");
+\&        my $summary   = $summarizer\->summarize_file("some/file.txt");
+\&                # or if you want to process in bulk
+\&        my @new_words = $summarizer\->scan_each("/directory/path/*");
+\&        my @summaries = $summarizer\->summarize_each("/directory/path/*");
 .Ve
 .SH "DESCRIPTION"
 .IX Header "DESCRIPTION"
-This module allows you to summarize bodies of text into a scored hash of \fIsentences\fR, \fIphrase-fragments\fR, and \fIindividual words\fR from the provided text.
-These scores reflect the weight (or precedence) of the relative text-fragments, i.e. how well they summarize or reflect the overall nature of the text.
-All of the sentences and phrase-fragments are drawn from within the existing text, and are \s-1NOT\s0 proceedurally generated.
-.PP
-\&\f(CW\*(C`$summarizer\->summarize_text\*(C'\fR and \f(CW\*(C`$summarizer\->summarize_file\*(C'\fR each return a hash-ref containing three array-refs (\f(CW\*(C`$summarizer\->summarize_all\*(C'\fR returns a list of these hash-refs):
-.IP "\fBsentences\fR a list of full sentences from the given article, with composite scores of the words contained therein" 2
-.IX Item "sentences a list of full sentences from the given article, with composite scores of the words contained therein"
+This module allows you to summarize bodies of text into a scored hash of  \fIsentences\fR,  \fIphrase-fragments\fR, and  \fIindividual words\fR from the provided text. These scores reflect the weight (or precedence) of the relative text-fragments, i.e. how well they summarize or reflect the overall nature of the text. All of the sentences and phrase-fragments are drawn from within the existing text, and are \s-1NOT\s0 proceedurally generated.
+.SH "ATTRIBUTES"
+.IX Header "ATTRIBUTES"
+\fIThe following constructor attributes are available to the user, and can be accessed/modified at any time via \f(CI\*(C`$summarizer\->_set_[attribute]\*(C'\fI:\fR
+.IX Subsection "The following constructor attributes are available to the user, and can be accessed/modified at any time via $summarizer->_set_[attribute]:"
+.ie n .IP "\fB\f(CB""permanent_path""\fB\fR  X [filepath] file containing a base set of universal stopwords (defaults to English stopwords)" 8
+.el .IP "\fB\f(CBpermanent_path\fB\fR  X [filepath] file containing a base set of universal stopwords (defaults to English stopwords)" 8
+.IX Item "permanent_path X [filepath] file containing a base set of universal stopwords (defaults to English stopwords)"
 .PD 0
-.IP "\fBfragments\fR a list of phrase fragments from the given article, scored as above" 2
-.IX Item "fragments a list of phrase fragments from the given article, scored as above"
-.IP "\fB    words\fR a list of all words in the article, scored by a three-factor system consisting of \fIfrequency of appearance\fR, \fIpopulation standard deviation of word clustering\fR, and \fIuse in selected phrase fragments\fR." 2
-.IX Item " words a list of all words in the article, scored by a three-factor system consisting of frequency of appearance, population standard deviation of word clustering, and use in selected phrase fragments."
+.ie n .IP "\fB\f(CB""stopwords_path""\fB\fR  X [filepath] file containing a list of new stopwords identified by the ""scan"" function" 8
+.el .IP "\fB\f(CBstopwords_path\fB\fR  X [filepath] file containing a list of new stopwords identified by the \f(CWscan\fR function" 8
+.IX Item "stopwords_path X [filepath] file containing a list of new stopwords identified by the scan function"
+.ie n .IP "\fB\f(CB""articles_path""\fB\fR   X [directory] folder containing some text-files you wish to summarize" 8
+.el .IP "\fB\f(CBarticles_path\fB\fR   X [directory] folder containing some text-files you wish to summarize" 8
+.IX Item "articles_path X [directory] folder containing some text-files you wish to summarize"
+.ie n .IP "\fB\f(CB""print_scanner""\fB\fR   X [boolean] flag that enables visual graphing of scanner activity (prints to ""STDOUT"")" 8
+.el .IP "\fB\f(CBprint_scanner\fB\fR   X [boolean] flag that enables visual graphing of scanner activity (prints to \f(CWSTDOUT\fR)" 8
+.IX Item "print_scanner X [boolean] flag that enables visual graphing of scanner activity (prints to STDOUT)"
+.ie n .IP "\fB\f(CB""print_summary""\fB\fR   X [boolean] flag that enables visual charting of summary activity (prints to ""STDOUT"")" 8
+.el .IP "\fB\f(CBprint_summary\fB\fR   X [boolean] flag that enables visual charting of summary activity (prints to \f(CWSTDOUT\fR)" 8
+.IX Item "print_summary X [boolean] flag that enables visual charting of summary activity (prints to STDOUT)"
+.ie n .IP "\fB\f(CB""return_count""\fB\fR    X [int] number of items to list when printing summary list" 8
+.el .IP "\fB\f(CBreturn_count\fB\fR    X [int] number of items to list when printing summary list" 8
+.IX Item "return_count X [int] number of items to list when printing summary list"
+.ie n .IP "\fB\f(CB""phrase_thresh""\fB\fR   X [int] minimum number of word tokens allowed in a phrase" 8
+.el .IP "\fB\f(CBphrase_thresh\fB\fR   X [int] minimum number of word tokens allowed in a phrase" 8
+.IX Item "phrase_thresh X [int] minimum number of word tokens allowed in a phrase"
+.ie n .IP "\fB\f(CB""phrase_radius""\fB\fR   X [int] distance iterated backward and forward from a given word when establishing a phrase (i.e. maximum length of phrase divided by 2)" 8
+.el .IP "\fB\f(CBphrase_radius\fB\fR   X [int] distance iterated backward and forward from a given word when establishing a phrase (i.e. maximum length of phrase divided by 2)" 8
+.IX Item "phrase_radius X [int] distance iterated backward and forward from a given word when establishing a phrase (i.e. maximum length of phrase divided by 2)"
+.ie n .IP "\fB\f(CB""freq_constant""\fB\fR   X [float] mathematical constant for establishing minimum threshold of occurence for frequently occuring words (defaults to 0.004)" 8
+.el .IP "\fB\f(CBfreq_constant\fB\fR   X [float] mathematical constant for establishing minimum threshold of occurence for frequently occuring words (defaults to \f(CW0.004\fR)" 8
+.IX Item "freq_constant X [float] mathematical constant for establishing minimum threshold of occurence for frequently occuring words (defaults to 0.004)"
 .PD
-The \f(CW\*(C`$summarizer\->pretty_print\*(C'\fR method prints a visually pleasing graph of the above three summary categories.
-.SS "About Fragments"
+.PP
+\fIThese attributes are read-only, and can be accessed via \f(CI\*(C`$summarizer\->[attribute]\*(C'\fI:\fR
+.IX Subsection "These attributes are read-only, and can be accessed via $summarizer->[attribute]:"
+.ie n .IP "\fB\f(CB""full_text""\fB\fR X [string] all the lines of the provided text, joined together" 8
+.el .IP "\fB\f(CBfull_text\fB\fR X [string] all the lines of the provided text, joined together" 8
+.IX Item "full_text X [string] all the lines of the provided text, joined together"
+.PD 0
+.ie n .IP "\fB\f(CB""sentences""\fB\fR X [array\-ref] list of each sentence found in the provided text" 8
+.el .IP "\fB\f(CBsentences\fB\fR X [array\-ref] list of each sentence found in the provided text" 8
+.IX Item "sentences X [array-ref] list of each sentence found in the provided text"
+.ie n .IP "\fB\f(CB""sen_words""\fB\fR X [array\-ref] for each sentence, contains an array of each word in order" 8
+.el .IP "\fB\f(CBsen_words\fB\fR X [array\-ref] for each sentence, contains an array of each word in order" 8
+.IX Item "sen_words X [array-ref] for each sentence, contains an array of each word in order"
+.ie n .IP "\fB\f(CB""word_list""\fB\fR X [array\-ref] each individual word of the entire text, in order (token stream)" 8
+.el .IP "\fB\f(CBword_list\fB\fR X [array\-ref] each individual word of the entire text, in order (token stream)" 8
+.IX Item "word_list X [array-ref] each individual word of the entire text, in order (token stream)"
+.ie n .IP "\fB\f(CB""freq_hash""\fB\fR X [hash\-ref] all words that occur more than a specified threshold, paired with their frequency of occurence" 8
+.el .IP "\fB\f(CBfreq_hash\fB\fR X [hash\-ref] all words that occur more than a specified threshold, paired with their frequency of occurence" 8
+.IX Item "freq_hash X [hash-ref] all words that occur more than a specified threshold, paired with their frequency of occurence"
+.ie n .IP "\fB\f(CB""clst_hash""\fB\fR X [hash\-ref] for each word in the text, specifies the position of each occurence of the word, both relative to the sentence it occurs in and absolute within the text" 8
+.el .IP "\fB\f(CBclst_hash\fB\fR X [hash\-ref] for each word in the text, specifies the position of each occurence of the word, both relative to the sentence it occurs in and absolute within the text" 8
+.IX Item "clst_hash X [hash-ref] for each word in the text, specifies the position of each occurence of the word, both relative to the sentence it occurs in and absolute within the text"
+.ie n .IP "\fB\f(CB""phrs_hash""\fB\fR X [hash\-ref] for each word in the text, contains a phrase of radius \fIr\fR centered around the given word, and references the sentence from which the phrase was gathered" 8
+.el .IP "\fB\f(CBphrs_hash\fB\fR X [hash\-ref] for each word in the text, contains a phrase of radius \fIr\fR centered around the given word, and references the sentence from which the phrase was gathered" 8
+.IX Item "phrs_hash X [hash-ref] for each word in the text, contains a phrase of radius r centered around the given word, and references the sentence from which the phrase was gathered"
+.ie n .IP "\fB\f(CB""sigma_hash""\fB\fR X [hash\-ref] gives the population standard deviation of the clustering of each word in the text" 8
+.el .IP "\fB\f(CBsigma_hash\fB\fR X [hash\-ref] gives the population standard deviation of the clustering of each word in the text" 8
+.IX Item "sigma_hash X [hash-ref] gives the population standard deviation of the clustering of each word in the text"
+.ie n .IP "\fB\f(CB""inter_hash""\fB\fR X [hash\-ref] list of each chosen phrase-fragment-scrap, paired with its score" 8
+.el .IP "\fB\f(CBinter_hash\fB\fR X [hash\-ref] list of each chosen phrase-fragment-scrap, paired with its score" 8
+.IX Item "inter_hash X [hash-ref] list of each chosen phrase-fragment-scrap, paired with its score"
+.ie n .IP "\fB\f(CB""score_hash""\fB\fR X [hash\-ref] list of each word in the text, paired with its score" 8
+.el .IP "\fB\f(CBscore_hash\fB\fR X [hash\-ref] list of each word in the text, paired with its score" 8
+.IX Item "score_hash X [hash-ref] list of each word in the text, paired with its score"
+.ie n .IP "\fB\f(CB""phrs_list""\fB\fR  X [hash\-ref] list of complete sentences that each scrap was drawn from, paired with its score" 8
+.el .IP "\fB\f(CBphrs_list\fB\fR  X [hash\-ref] list of complete sentences that each scrap was drawn from, paired with its score" 8
+.IX Item "phrs_list X [hash-ref] list of complete sentences that each scrap was drawn from, paired with its score"
+.ie n .IP "\fB\f(CB""frag_list""\fB\fR  X [array\-ref] for each chosen scrap, contains a hash of: the pivot word of the scrap; the sentence containing the scrap; the number of occurences of each word in the sentence; an ordered list of the words in the phrase from which the scrap was derived" 8
+.el .IP "\fB\f(CBfrag_list\fB\fR  X [array\-ref] for each chosen scrap, contains a hash of: the pivot word of the scrap; the sentence containing the scrap; the number of occurences of each word in the sentence; an ordered list of the words in the phrase from which the scrap was derived" 8
+.IX Item "frag_list X [array-ref] for each chosen scrap, contains a hash of: the pivot word of the scrap; the sentence containing the scrap; the number of occurences of each word in the sentence; an ordered list of the words in the phrase from which the scrap was derived"
+.ie n .IP "\fB\f(CB""file_name""\fB\fR X [string] the filename of the current text-source (if text was extracted from a file)" 8
+.el .IP "\fB\f(CBfile_name\fB\fR X [string] the filename of the current text-source (if text was extracted from a file)" 8
+.IX Item "file_name X [string] the filename of the current text-source (if text was extracted from a file)"
+.ie n .IP "\fB\f(CB""text_hint""\fB\fR X [string] brief snippet of text containing the first 50 and the final 30 characters of the current text" 8
+.el .IP "\fB\f(CBtext_hint\fB\fR X [string] brief snippet of text containing the first 50 and the final 30 characters of the current text" 8
+.IX Item "text_hint X [string] brief snippet of text containing the first 50 and the final 30 characters of the current text"
+.ie n .IP "\fB\f(CB""summary""\fB\fR X [hash\-ref] scored lists of each summary sentence, each chosen scrap, and each frequently-occuring word" 8
+.el .IP "\fB\f(CBsummary\fB\fR X [hash\-ref] scored lists of each summary sentence, each chosen scrap, and each frequently-occuring word" 8
+.IX Item "summary X [hash-ref] scored lists of each summary sentence, each chosen scrap, and each frequently-occuring word"
+.PD
+.SH "FUNCTIONS"
+.IX Header "FUNCTIONS"
+.ie n .SS """scan"""
+.el .SS "\f(CWscan\fP"
+.IX Subsection "scan"
+Scan is a utility that allows the Text::Summarizer to parse through a body of text to find words that occur with unusually high frequency. These words are then stored as new stopwords via the provided \f(CW\*(C`stopwords_path\*(C'\fR. Additionally, calling any of the three \f(CW\*(C`scan_[...]\*(C'\fR subroutines will return a reference (or array of references) to an unordered list containing the new stopwords.
+.PP
+.Vb 3
+\&        $new_words     = $summarizer\->scan_text( \*(Aqthis is a sample text\*(Aq )
+\&        $new_words     = $summarizer\->scan_file( \*(Aqsome/file/path.txt\*(Aq );
+\&        @arr_new_words = $summarizer\->scan_each( \*(Aqsome/directory/*\*(Aq );
+.Ve
+.ie n .SS """summarize"""
+.el .SS "\f(CWsummarize\fP"
+.IX Subsection "summarize"
+Summarizing is, not surprisingly, the heart of the Text::Summarizer. Summarizing a body of text provides three distinct categories of information drawn from the existing text and ordered by relevance to the summary: \fIfull sentences\fR, \fIphrase-fragments / context-free token streams\fR, and a list of \fIfrequently occuring words\fR.
+.PP
+There are three provided functions for summarizing text documents.
+.PP
+.Vb 3
+\&        $summary   = $summarizer\->summarize_text( \*(Aqthis is a sample text\*(Aq )
+\&        $summary   = $summarizer\->summarize_file( \*(Aqsome/file/path.txt\*(Aq );
+\&        @summaries = $summarizer\->summarize_each( \*(Aqsome/directory/*\*(Aq );
+.Ve
+.PP
+\&\f(CW\*(C`summarize_text\*(C'\fR and \f(CW\*(C`summarize_file\*(C'\fR each return a summary hash-ref containing three array-refs, while \f(CW\*(C`summarize_each\*(C'\fR returns a list of these hash-refs. These summary hashes take the following form:
+.ie n .IP """\fBsentences\fP"" => a list of full sentences from the given text, with composite scores of the words contained therein" 8
+.el .IP "\f(CW\f(CBsentences\f(CW\fR => a list of full sentences from the given text, with composite scores of the words contained therein" 8
+.IX Item "sentences => a list of full sentences from the given text, with composite scores of the words contained therein"
+.PD 0
+.ie n .IP """\fBfragments\fP"" => a list of phrase fragments from the given text, scored similarly to sentences" 8
+.el .IP "\f(CW\f(CBfragments\f(CW\fR => a list of phrase fragments from the given text, scored similarly to sentences" 8
+.IX Item "fragments => a list of phrase fragments from the given text, scored similarly to sentences"
+.ie n .IP """\fBwords\fP""     => a list of all words in the text, scored by a three-factor system consisting of  \fIfrequency of appearance\fR,  \fIpopulation standard deviation\fR, and  \fIuse in important phrase fragments\fR." 8
+.el .IP "\f(CW\f(CBwords\f(CW\fR     => a list of all words in the text, scored by a three-factor system consisting of  \fIfrequency of appearance\fR,  \fIpopulation standard deviation\fR, and  \fIuse in important phrase fragments\fR." 8
+.IX Item "words => a list of all words in the text, scored by a three-factor system consisting of frequency of appearance, population standard deviation, and use in important phrase fragments."
+.PD
+.PP
+\fIAbout Fragments\fR
 .IX Subsection "About Fragments"
-Phrase fragments are in actuallity short \*(L"scraps\*(R" of text (usually only two or three words) that are derived from the text via the following process:
-.IP "1." 8
-the entirety of the text is tokenized and scored into a \f(CW\*(C`frequency\*(C'\fR table, with a high-pass threshold of frequencies above \f(CW\*(C`# of tokens * user\-defined scaling factor\*(C'\fR
-.IP "2." 8
-each sentence is tokenized and stored in an array
-.IP "3." 8
-for each word within the \f(CW\*(C`frequency\*(C'\fR table, a table of phrase-fragments is derived by finding each occurance of said word and tracking forward and backward by a user-defined \*(L"radius\*(R" of tokens (defaults to \f(CW\*(C`radius = 5\*(C'\fR, does not include the central key-word) X each phrase-fragment is thus compiled of (by default) an 11\-token string
-.IP "4." 8
-all fragments for a given key-word are then compared to each other, and each word is deleted if it appears only once amongst all of the fragments
-(leaving only \f(CW\*(C`\f(CIA\f(CW X \f(CIB\f(CW X ... X \f(CIS\f(CW\*(C'\fR where \fIA\fR, \fIB\fR,...,\fIS\fR are the phrase-fragments)
-.IP "5." 8
-what remains of each fragment is a list of \*(L"scraps\*(R" X strings of consecutive tokens X from which the longest scrap is chosen as a representation of the given phrase-fragment
-.IP "6." 8
-when a shorter fragment-scrap is included in the text of a longer scrap (i.e. a different phrase-fragment), the shorter is deleted and its score is added to the score of the longer
-.IP "7." 8
-when multiple fragments are equivalent (i.e. they consist of the same list of tokens when stopwords are excluded), they are condensed into a single scrap in the form of \f(CW"(some|word|tokens)"\fR such that the fragment now represents the tokens of the scrap (excluding stopwords) regardless of order
+.PP
+Phrase fragments are in actuality short \*(L"scraps\*(R" of text (usually only two or three words) that are derived from the text via the following process:
+.ie n .IP "1. the entirety of the text is tokenized and scored into a ""frequency"" table, with a high-pass threshold of frequencies above ""# of tokens * user\-defined scaling factor""" 8
+.el .IP "1. the entirety of the text is tokenized and scored into a \f(CWfrequency\fR table, with a high-pass threshold of frequencies above \f(CW# of tokens * user\-defined scaling factor\fR" 8
+.IX Item "1. the entirety of the text is tokenized and scored into a frequency table, with a high-pass threshold of frequencies above # of tokens * user-defined scaling factor"
+.PD 0
+.IP "2. each sentence is tokenized and stored in an array" 8
+.IX Item "2. each sentence is tokenized and stored in an array"
+.ie n .IP "3. for each word within the ""frequency"" table, a table of phrase-fragments is derived by finding each occurance of said word and tracking forward and backward by a user-defined ""radius"" of tokens (defaults to ""radius\ =\ 5"", does not include the central key-word) X each phrase-fragment is thus compiled of (by default) an 11\-token string" 8
+.el .IP "3. for each word within the \f(CWfrequency\fR table, a table of phrase-fragments is derived by finding each occurance of said word and tracking forward and backward by a user-defined ``radius'' of tokens (defaults to \f(CWradius\ =\ 5\fR, does not include the central key-word) X each phrase-fragment is thus compiled of (by default) an 11\-token string" 8
+.IX Item "3. for each word within the frequency table, a table of phrase-fragments is derived by finding each occurance of said word and tracking forward and backward by a user-defined radius of tokens (defaults to radius=5, does not include the central key-word) X each phrase-fragment is thus compiled of (by default) an 11-token string"
+.ie n .IP "4. all fragments for a given key-word are then compared to each other, and each word is deleted if it appears only once amongst all of the fragments (leaving only ""\fIA\fP X \fIB\fP X ... X \fIS\fP"" where \fIA\fR, \fIB\fR, ..., \fIS\fR are the phrase-fragments)" 8
+.el .IP "4. all fragments for a given key-word are then compared to each other, and each word is deleted if it appears only once amongst all of the fragments (leaving only \f(CW\f(CIA\f(CW X \f(CIB\f(CW X ... X \f(CIS\f(CW\fR where \fIA\fR, \fIB\fR, ..., \fIS\fR are the phrase-fragments)" 8
+.IX Item "4. all fragments for a given key-word are then compared to each other, and each word is deleted if it appears only once amongst all of the fragments (leaving only A X B X ... X S where A, B, ..., S are the phrase-fragments)"
+.ie n .IP "5. what remains of each fragment is a list of ""scraps"" X strings of consecutive tokens X from which the longest scrap is chosen as a representation of the given phrase-fragment" 8
+.el .IP "5. what remains of each fragment is a list of ``scraps'' X strings of consecutive tokens X from which the longest scrap is chosen as a representation of the given phrase-fragment" 8
+.IX Item "5. what remains of each fragment is a list of scraps X strings of consecutive tokens X from which the longest scrap is chosen as a representation of the given phrase-fragment"
+.ie n .IP "6. when a shorter fragment-scrap (""\fIA\fP"") is included in the text of a longer scrap (""\fIB\fP"") such that ""\fIA\fP X \fIB\fP"", the shorter is deleted and its score is added to that of the longer" 8
+.el .IP "6. when a shorter fragment-scrap (\f(CW\f(CIA\f(CW\fR) is included in the text of a longer scrap (\f(CW\f(CIB\f(CW\fR) such that \f(CW\f(CIA\f(CW X \f(CIB\f(CW\fR, the shorter is deleted and its score is added to that of the longer" 8
+.IX Item "6. when a shorter fragment-scrap (A) is included in the text of a longer scrap (B) such that A X B, the shorter is deleted and its score is added to that of the longer"
+.ie n .IP "7. when multiple fragments are equivalent (i.e. they consist of the same list of tokens when stopwords are excluded), they are condensed into a single scrap in the form of ""(some|word|tokens)"" such that the fragment now represents the tokens of the scrap (excluding stopwords) regardless of order (refered to as a ""context-free token stream"")" 8
+.el .IP "7. when multiple fragments are equivalent (i.e. they consist of the same list of tokens when stopwords are excluded), they are condensed into a single scrap in the form of \f(CW``(some|word|tokens)''\fR such that the fragment now represents the tokens of the scrap (excluding stopwords) regardless of order (refered to as a ``context-free token stream'')" 8
+.IX Item "7. when multiple fragments are equivalent (i.e. they consist of the same list of tokens when stopwords are excluded), they are condensed into a single scrap in the form of ""(some|word|tokens)"" such that the fragment now represents the tokens of the scrap (excluding stopwords) regardless of order (refered to as a context-free token stream)"
+.PD
 .SH "SUPPORT"
 .IX Header "SUPPORT"
 Bugs should always be submitted via the project hosting bug tracker
 .PP
-https://github.com/faelin/text\-summarizer/issues
+<https://github.com/faelin/text\-summarizer/issues>
 .PP
 For other issues, contact the maintainer.
 .SH "AUTHOR"
 .IX Header "AUTHOR"
-Faelin Landy (\s-1CPAN: FAELIN\s0) faelin.landy@gmail.com (current maintainer)
+Faelin Landy <faelin.landy@gmail.com> (current maintainer)
+.SH "CONTRIBUTORS"
+.IX Header "CONTRIBUTORS"
+* Michael McClennen <michaelm@umich.edu>
 .SH "COPYRIGHT AND LICENSE"
 .IX Header "COPYRIGHT AND LICENSE"
-Copyright (C) 2018 by Faelin Landy
+Copyright (c) 2018 by the \s-1AUTHOR\s0 as listed above
 .PP
 This program is free software: you can redistribute it and/or modify it under the terms of the \s-1GNU\s0 Lesser General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 .PP
