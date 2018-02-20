@@ -6,14 +6,15 @@ Text::Summarizer - Summarize Bodies of Text
 
 	use Text::Summarizer;
 	
-	my $summarizer = Text::Summarizer->new();
+	my $summarizer = Text::Summarizer->new( print_scanner => 1, print_summary => 1 );
 	
+	my $new_words = $summarizer->scan_file("articles/article00.txt");
 	my $summary   = $summarizer->summarize_file("articles/article00.txt");
-		#or if you want to process in bulk
+		# or if you want to process in bulk
+	my @new_words = $summarizer->scan_each("articles/*");
 	my @summaries = $summarizer->summarize_each("articles/*");
 
 # DESCRIPTION
-
 This module allows you to summarize bodies of text into a scored hash of  _sentences_,  _phrase-fragments_, and  _individual words_ from the provided text. These scores reflect the weight (or precedence) of the relative text-fragments, i.e. how well they summarize or reflect the overall nature of the text. All of the sentences and phrase-fragments are drawn from within the existing text, and are NOT proceedurally generated.
 
 # ATTRIBUTES
@@ -72,7 +73,7 @@ There are three provided functions for summarizing text documents.
 `summarize_text` and `summarize_file` each return a summary hash-ref containing three array-refs, while `summarize_each` returns a list of these hash-refs. These summary hashes take the following form:
 - **sentences** => a list of full sentences from the given text, with composite scores of the words contained therein
 
-- **fragments** => a list of phrase fragments from the given text, scored as similarly to sentences
+- **fragments** => a list of phrase fragments from the given text, scored similarly to sentences
 
 - **words**     => a list of all words in the text, scored by a three-factor system consisting of  _frequency of appearance_,  _population standard deviation_, and  _use in important phrase fragments_.
 
