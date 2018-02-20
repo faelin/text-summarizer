@@ -4,7 +4,7 @@ use v5.10.0;
 use strict;
 use warnings;
 use Moo;
-use Types::Standard qw/ Ref Str Int Num InstanceOf Bool /;
+use Types::Standard qw/ Bool Ref Str Int Num InstanceOf Bool /;
 use List::AllUtils qw/ max min sum sum0 singleton /;
 use Algorithm::CurveFit;
 use utf8;
@@ -39,15 +39,20 @@ has articles_path => (
 	default => 'articles/*'
 );
 
+has store_scanner => (
+	is => 'rw',
+	isa => Bool
+);
+
 has print_scanner => (
 	is => 'rw',
-	isa => Str,
+	isa => Bool,
 	default => 0
 );
 
 has print_summary => (
 	is => 'rw',
-	isa => Str,
+	isa => Bool,
 	default => 0
 );
 
@@ -89,6 +94,7 @@ has stopwords => (
 has watchlist => (
 	is => 'rwp',
 	isa => Ref['HASH'],
+	lazy => 1,
 );
 
 has article_length => (
@@ -173,17 +179,29 @@ has text_hint => (
 	isa => Str,
 );
 
+sub _build_watchlist {
+	my $self = shift;
+	my %watchlist;
+
+	open( my $stopwords_file, '<', $self->stopwords_path )
+		or die "Can't open stopwords scanner file" . $self->stopwords_path . ": $!";
+	chomp and $watchlist{ $_ } = 1 for (<$stopwords_file>);
+	close $stopwords_file;
+
+	return \%watchlist;
+}
+
 sub _build_stopwords {
 	my $self = shift;
 	my %stopwords;
 
 	open( my $permanent_file, '<', $self->permanent_path )
- 		or die "Can't open " . $self->permanent_path . ": $!";
+ 		or die "Can't open stopwords permanent file " . $self->permanent_path . ": $!";
 	chomp and $stopwords{ $_ } = 1 for (<$permanent_file>);
 	close $permanent_file;
 
 	open( my $stopwords_file, '<', $self->stopwords_path )
-		or die "Can't open " . $self->stopwords_path . ": $!";
+		or die "Can't open stopwords scanner file" . $self->stopwords_path . ": $!";
 	chomp and $stopwords{ $_ } = 1 for (<$stopwords_file>);
 	close $stopwords_file;
 
@@ -193,9 +211,9 @@ sub _build_stopwords {
 sub _store_stopwords {
 	my $self = shift;
 
-	open( my $stopwords_file, ">>", $self->stopwords_path)
-		or die "Can't open $self->stopwords_file: $!";
-	#print $stopwords_file "$_\n" for sort keys %{$self->stopwords};
+	open( my $stopwords_file, ">", $self->stopwords_path)
+		or die "Can't open stopwords scanner file " . $self->stopwords_file . ": $!";
+	grep { print $stopwords_file "$_\n" } sort keys %{$self->watchlist} if $self->store_scanner;
 	close $stopwords_file;
 
 	return $self;
@@ -235,7 +253,7 @@ sub scan_file {
 	my ($self, $file_path) = @_;
 
 	open( my $file, '<:encoding(UTF-8)', $file_path )
-		or die "Can't open $file_path: $!";
+		or die "Can't open file $file_path for scanning: $!";
 
 	return $self->scan_text( $file, $file_path );
 }
@@ -278,7 +296,7 @@ sub summarize_file {
 	my ($self, $file_path) = @_;
 
 	open( my $file, '<:encoding(UTF-8)', $file_path )
-		or die "Can't open $file_path: $!";
+		or die "Can't open file $file_path for summarizing: $!";
 
 	return $self->summarize_text( $file, $file_path );
 }
@@ -803,17 +821,21 @@ B< The following constructor attributes are available to the user, and can be ac
 
 =over 8
 
+=item C<articles_path>   – [directory]
+
+folder containing some text-files you wish to summarize
+
 =item C<permanent_path>  – [filepath]
 
 file containing a base set of universal stopwords (defaults to English stopwords)
 
 =item C<stopwords_path>  – [filepath]
 
-file containing a list of new stopwords identified by the C<< scan >> function
+file containing a list of new stopwords identified by the C<scan> function
 
-=item C<articles_path>   – [directory]
+=item C<store_scanner>   – [boolean]
 
-folder containing some text-files you wish to summarize
+flag for storing new stopwords in the file indicated by C<stopwords_path>
 
 =item C<print_scanner>   – [boolean]
 
@@ -906,6 +928,14 @@ brief snippet of text containing the first 50 and the final 30 characters of the
 
 scored lists of each summary sentence, each chosen scrap, and each frequently-occuring word
 
+=item C<stopwords> - [hash-ref]
+
+list of all stopwords, both permanent and proceedural
+
+=item C<watchlist> - [hash-ref]
+
+list of proceedurally generated stopwords, derived by the `scan` function
+
 =back
 
 
@@ -937,15 +967,15 @@ C<< summarize_text >> and C<< summarize_file >> each return a summary hash-ref c
 
 =item *
 
-C<B<sentences>> => a list of full sentences from the given text, with composite scores of the words contained therein
+C<sentences> => a list of full sentences from the given text, with composite scores of the words contained therein
 
 =item *
 
-C<B<fragments>> => a list of phrase fragments from the given text, scored similarly to sentences
+C<fragments> => a list of phrase fragments from the given text, scored similarly to sentences
 
 =item *
 
-C<B<words>>     => a list of all words in the text, scored by a three-factor system consisting of  I<frequency of appearance>,  I<population standard deviation>, and  I<use in important phrase fragments>.
+C<words>     => a list of all words in the text, scored by a three-factor system consisting of  I<frequency of appearance>,  I<population standard deviation>, and  I<use in important phrase fragments>.
 
 =back
 

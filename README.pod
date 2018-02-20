@@ -40,17 +40,21 @@ B< The following constructor attributes are available to the user, and can be ac
 
 =over 8
 
+=item C<articles_path>   – [directory]
+
+folder containing some text-files you wish to summarize
+
 =item C<permanent_path>  – [filepath]
 
 file containing a base set of universal stopwords (defaults to English stopwords)
 
 =item C<stopwords_path>  – [filepath]
 
-file containing a list of new stopwords identified by the C<< scan >> function
+file containing a list of new stopwords identified by the C<scan> function
 
-=item C<articles_path>   – [directory]
+=item C<store_scanner>   – [boolean]
 
-folder containing some text-files you wish to summarize
+flag for storing new stopwords in the file indicated by C<stopwords_path>
 
 =item C<print_scanner>   – [boolean]
 
@@ -143,6 +147,14 @@ brief snippet of text containing the first 50 and the final 30 characters of the
 
 scored lists of each summary sentence, each chosen scrap, and each frequently-occuring word
 
+=item C<stopwords> - [hash-ref]
+
+list of all stopwords, both permanent and proceedural
+
+=item C<watchlist> - [hash-ref]
+
+list of proceedurally generated stopwords, derived by the `scan` function
+
 =back
 
 
@@ -174,15 +186,15 @@ C<< summarize_text >> and C<< summarize_file >> each return a summary hash-ref c
 
 =item *
 
-C<B<sentences>> => a list of full sentences from the given text, with composite scores of the words contained therein
+C<sentences> => a list of full sentences from the given text, with composite scores of the words contained therein
 
 =item *
 
-C<B<fragments>> => a list of phrase fragments from the given text, scored similarly to sentences
+C<fragments> => a list of phrase fragments from the given text, scored similarly to sentences
 
 =item *
 
-C<B<words>>     => a list of all words in the text, scored by a three-factor system consisting of  I<frequency of appearance>,  I<population standard deviation>, and  I<use in important phrase fragments>.
+C<words>     => a list of all words in the text, scored by a three-factor system consisting of  I<frequency of appearance>,  I<population standard deviation>, and  I<use in important phrase fragments>.
 
 =back
 

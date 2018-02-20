@@ -24,11 +24,12 @@ This module allows you to summarize bodies of text into a scored hash of  _sente
 
 # ATTRIBUTES
 **The following constructor attributes are available to the user, and can be accessed/modified at any time via `$summarizer->[attribute]`:**
+* `articles_path`  - [directory] folder containing some text-files you wish to summarize
 * `permanent_path` - [filepath] file containing a base set of universal stopwords (defaults to English stopwords)
 * `stopwords_path` - [filepath] file containing a list of new stopwords identified by the `scan` function
-* `articles_path`  - [directory] folder containing some text-files you wish to summarize
-* `print_scanner`  - [boolean] flag that enables visual graphing of scanner activity (prints to STDOUT)
-* `print_summary`  - [boolean] flag that enables visual charting of summary activity (prints to STDOUT)
+* `store_scanner`  - [boolean] flag for storing new stopwords in the file indicated by `stopwords_path`
+* `print_scanner`  - [boolean] flag that enables visual graphing of scanner activity (prints to `STDOUT`)
+* `print_summary`  - [boolean] flag that enables visual charting of summary activity (prints to `STDOUT`)
 * `return_count`   - [int] number of items to list when printing summary list
 * `phrase_thresh`  - [int] minimum number of word tokens allowed in a phrase
 * `phrase_radius`  - [int] distance iterated backward and forward from a given word when establishing a phrase (i.e. maximum length of phrase divided by 2)
@@ -48,14 +49,11 @@ This module allows you to summarize bodies of text into a scored hash of  _sente
 * `score_hash` - [hash-ref] list of each word in the text, paired with its score
 * `phrs_list`  - [hash-ref] list of complete sentences that each scrap was drawn from, paired with its score
 * `frag_list`  - [array-ref] for each chosen scrap, contains a hash of: the pivot word of the scrap; the sentence containing the scrap; the number of occurences of each word in the sentence; an ordered list of the words in the phrase from which the scrap was derived
-
-
 * `file_name` - [string] the filename of the current text-source (if text was extracted from a file)
 * `text_hint` - [string] brief snippet of text containing the first 50 and the final 30 characters of the current text
-
-
 * `summary` - [hash-ref] scored lists of each summary sentence, each chosen scrap, and each frequently-occuring word
-
+* `stopwords` - [hash-ref] list of all stopwords, both permanent and proceedural
+* `watchlist` - [hash-ref] list of proceedurally generated stopwords, derived by the `scan` function
 
 
 # FUNCTIONS
@@ -76,11 +74,11 @@ There are three provided functions for summarizing text documents.
 	@summaries = $summarizer->summarize_each( 'some/directory/*' );
 
 `summarize_text` and `summarize_file` each return a summary hash-ref containing three array-refs, while `summarize_each` returns a list of these hash-refs. These summary hashes take the following form:
-- **sentences** => a list of full sentences from the given text, with composite scores of the words contained therein
+- `sentences` => a list of full sentences from the given text, with composite scores of the words contained therein
 
-- **fragments** => a list of phrase fragments from the given text, scored similarly to sentences
+- `fragments` => a list of phrase fragments from the given text, scored similarly to sentences
 
-- **words**     => a list of all words in the text, scored by a three-factor system consisting of  _frequency of appearance_,  _population standard deviation_, and  _use in important phrase fragments_.
+- `words`     => a list of all words in the text, scored by a three-factor system consisting of  _frequency of appearance_,  _population standard deviation_, and  _use in important phrase fragments_.
 
 
 ### About Fragments
