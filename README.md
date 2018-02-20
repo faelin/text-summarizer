@@ -18,7 +18,7 @@ Text::Summarizer - Summarize Bodies of Text
 This module allows you to summarize bodies of text into a scored hash of  _sentences_,  _phrase-fragments_, and  _individual words_ from the provided text. These scores reflect the weight (or precedence) of the relative text-fragments, i.e. how well they summarize or reflect the overall nature of the text. All of the sentences and phrase-fragments are drawn from within the existing text, and are NOT proceedurally generated.
 
 # ATTRIBUTES
-**The following constructor attributes are available to the user, and can be accessed/modified at any time via `$summarizer->_set_[attribute]`:**
+**The following constructor attributes are available to the user, and can be accessed/modified at any time via `$summarizer->[attribute]`:**
 * `permanent_path` - [filepath] file containing a base set of universal stopwords (defaults to English stopwords)
 * `stopwords_path` - [filepath] file containing a list of new stopwords identified by the `scan` function
 * `articles_path`  - [directory] folder containing some text-files you wish to summarize
