@@ -18,7 +18,7 @@ require Exporter;
 @EXPORT = qw();
 @EXPORT_OK = qw();
 %EXPORT_TAGS = (all => [@EXPORT_OK]);
-$VERSION = '1.051';
+$VERSION = '1.052';
 
 
 has permanent_path => (
@@ -787,7 +787,7 @@ This module allows you to summarize bodies of text into a scored hash of  I<sent
 
 =head1 ATTRIBUTES
 
-=head3 The following constructor attributes are available to the user, and can be accessed/modified at any time via C<< $summarizer->_set_[attribute] >>:
+=head2 The following constructor attributes are available to the user, and can be accessed/modified at any time via C<< $summarizer->_set_[attribute] >>:
 
 =over 8
 
@@ -812,7 +812,7 @@ This module allows you to summarize bodies of text into a scored hash of  I<sent
 =back
 
 
-=head3 These attributes are read-only, and can be accessed via C<< $summarizer->[attribute] >>:
+=head2 These attributes are read-only, and can be accessed via C<< $summarizer->[attribute] >>:
 
 =over 8
 

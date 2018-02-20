@@ -3,8 +3,9 @@ do{ my $x = {
        'conflicts' => {},
        'recommends' => {},
        'requires' => {
+                       'Algorithm::CurveFit' => 0,
                        'List::AllUtils' => 0,
-                       'Moo' => '2.003002',
+                       'Moo' => 0,
                        'Types::Standard' => 0
                      },
        'test_requires' => {}

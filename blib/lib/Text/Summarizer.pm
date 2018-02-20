@@ -18,7 +18,7 @@ require Exporter;
 @EXPORT = qw();
 @EXPORT_OK = qw();
 %EXPORT_TAGS = (all => [@EXPORT_OK]);
-$VERSION = '1.050';
+$VERSION = '1.051';
 
 
 has permanent_path => (

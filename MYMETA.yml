@@ -15,13 +15,14 @@ name: Text-Summarizer
 provides:
   Text::Summarizer:
     file: lib/Text/Summarizer.pm
-    version: '1.041'
+    version: '1.050'
 requires:
+  Algorithm::CurveFit: '0'
   List::AllUtils: '0'
-  Moo: '2.003002'
+  Moo: '0'
   Types::Standard: '0'
 resources:
   license: http://dev.perl.org/licenses/
   repository: https://github.com/faelin/text-summarizer/
-version: '1.041'
+version: '1.050'
 x_serialization_backend: 'CPAN::Meta::YAML version 0.018'

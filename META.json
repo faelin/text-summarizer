@@ -21,8 +21,9 @@
       },
       "runtime" : {
          "requires" : {
+            "Algorithm::CurveFit" : "0",
             "List::AllUtils" : "0",
-            "Moo" : "2.003002",
+            "Moo" : "0",
             "Types::Standard" : "0"
          }
       }
@@ -30,7 +31,7 @@
    "provides" : {
       "Text::Summarizer" : {
          "file" : "lib/Text/Summarizer.pm",
-         "version" : "1.050"
+         "version" : "1.051"
       }
    },
    "release_status" : "stable",
@@ -42,6 +43,6 @@
          "url" : "https://github.com/faelin/text-summarizer/"
       }
    },
-   "version" : "1.050",
+   "version" : "1.051",
    "x_serialization_backend" : "JSON::PP version 2.27300"
 }
