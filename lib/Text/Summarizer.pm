@@ -765,9 +765,15 @@ __END__
  
 =encoding utf-8
 
+
+
+
 =head1 NAME
 
 Text::Summarizer - Summarize Bodies of Text
+
+
+
 
 =head1 SYNOPSIS
 
@@ -781,9 +787,15 @@ Text::Summarizer - Summarize Bodies of Text
 	my @new_words = $summarizer->scan_each("/directory/path/*");
 	my @summaries = $summarizer->summarize_each("/directory/path/*");
 
+
+
+
 =head1 DESCRIPTION
 
 This module allows you to summarize bodies of text into a scored hash of  I<sentences>,  I<phrase-fragments>, and  I<individual words> from the provided text. These scores reflect the weight (or precedence) of the relative text-fragments, i.e. how well they summarize or reflect the overall nature of the text. All of the sentences and phrase-fragments are drawn from within the existing text, and are NOT proceedurally generated.
+
+
+
 
 =head1 ATTRIBUTES
 
@@ -897,6 +909,8 @@ scored lists of each summary sentence, each chosen scrap, and each frequently-oc
 =back
 
 
+
+
 =head1 FUNCTIONS
 
 =head2 C<scan>
@@ -935,6 +949,9 @@ C<B<words>>     => a list of all words in the text, scored by a three-factor sys
 
 =back
 
+
+
+
 =head3 About Fragments
 
 Phrase fragments are in actuality short "scraps" of text (usually only two or three words) that are derived from the text via the following process:
@@ -971,6 +988,9 @@ when multiple fragments are equivalent (i.e. they consist of the same list of to
 
 =back
 
+
+
+
 =head1 SUPPORT
 
 Bugs should always be submitted via the project hosting bug tracker
@@ -979,13 +999,22 @@ L<https://github.com/faelin/text-summarizer/issues>
 
 For other issues, contact the maintainer.
 
+
+
+
 =head1 AUTHOR
 
 Faelin Landy <faelin.landy@gmail.com> (current maintainer)
 
+
+
+
 =head1 CONTRIBUTORS
 
 * Michael McClennen <michaelm@umich.edu>
+
+
+
 
 =head1 COPYRIGHT AND LICENSE
 
