@@ -5,16 +5,15 @@ Text::Summarizer - Summarize Bodies of Text
 
 
 # SYNOPSIS
-
 	use Text::Summarizer;
 
 	my $summarizer = Text::Summarizer->new( print_scanner => 1, print_summary => 1 );
 	
-	my $new_words = $summarizer->scan_file("articles/article00.txt");
-	my $summary   = $summarizer->summarize_file("articles/article00.txt");
+	my $new_words = $summarizer->scan_file("some/file.txt");
+	my $summary   = $summarizer->summarize_file("some/file.txt");
 		# or if you want to process in bulk
-	my @new_words = $summarizer->scan_each("articles/*");
-	my @summaries = $summarizer->summarize_each("articles/*");
+	my @new_words = $summarizer->scan_each("/directory/glob/*");
+	my @summaries = $summarizer->summarize_each("/directory/glob/*");
 
 
 
@@ -41,21 +40,13 @@ This module allows you to summarize bodies of text into a scored hash of  _sente
 * `sentences` - [array-ref] list of each sentence from the `full_text`
 * `sen_words` - [array-ref] list that, for each sentence, contains an array of each word in order
 * `word_list` - [array-ref] each individual word of the entire text, in order (token stream)
-
-
 * `freq_hash` - [hash-ref] all words that occur more than a specified threshold, paired with their frequency of occurence
 * `clst_hash` - [hash-ref] for each word in the text, specifies the position of each occurence of the word, both relative to the sentence it occurs in and absolute within the text
 * `phrs_hash` - [hash-ref] for each word in the text, contains a phrase of radius _r_ centered around the given word, and references the sentence from which the phrase was gathered
-
-
 * `sigma_hash` - [hash-ref] gives the population standard deviation of the clustering of each word in the text
-
-
 * `inter_hash` - [hash-ref] list of each chosen phrase-fragment-scrap, paired with its score
 * `score_hash` - [hash-ref] list of each word in the text, paired with its score
 * `phrs_list`  - [hash-ref] list of complete sentences that each scrap was drawn from, paired with its score
-
-
 * `frag_list`  - [array-ref] for each chosen scrap, contains a hash of: the pivot word of the scrap; the sentence containing the scrap; the number of occurences of each word in the sentence; an ordered list of the words in the phrase from which the scrap was derived
 
 

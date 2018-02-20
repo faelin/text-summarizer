@@ -784,8 +784,8 @@ Text::Summarizer - Summarize Bodies of Text
 	my $new_words = $summarizer->scan_file("some/file.txt");
 	my $summary   = $summarizer->summarize_file("some/file.txt");
 		# or if you want to process in bulk
-	my @new_words = $summarizer->scan_each("/directory/path/*");
-	my @summaries = $summarizer->summarize_each("/directory/path/*");
+	my @new_words = $summarizer->scan_each("/directory/glob/*");
+	my @summaries = $summarizer->summarize_each("/directory/glob/*");
 
 
 
