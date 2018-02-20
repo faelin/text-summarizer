@@ -7,9 +7,11 @@ use Test::More;
 use List::AllUtils qw/ all all_u /;
 
 
-
+#test object instantiation
 my $summarizer = new_ok( Text::Summarizer => [ articles_path => "articles/*" ] );
 
+
+#test default datafile existence
 subtest 'Datafile Attributes Set' => sub {
 	my $paths = ['data/permanent.stop','data/stopwords.stop','data/watchlist.stop'];
 	is $summarizer->permanent_path, $paths->[0] => "permanent path is '$paths->[0]'";
@@ -17,6 +19,7 @@ subtest 'Datafile Attributes Set' => sub {
 };
 
 
+#test structure of summaries returned from summarize function
 sub summary_test {
 	my @summaries = @_;
 
@@ -32,6 +35,16 @@ sub summary_test {
 		 ok all_u( sub { all_u( sub { /[\w'’-]+/x } => keys %{$_->{  words  }} ) } => @summaries ), 'all words look like words';
 	}
 }
+
+
+sub scanner_test {
+	my @results = @_;
+
+	if ( ok all_u( sub { ref $_ eq 'HASH' } => @results), 'all scanner results in hash form' ) {
+		 ok all_u( sub { all_u( sub { /[\w'’-]+/x } => keys %{$_} ) } => @results ), 'all scanner results look like word-lists'
+	}
+}
+
 
 my $some_text = <<'END_SAMPLE';
 	Avram Noam Chomsky, born December 7, 1928) is an American linguist, cognitive scientist, historian, social critic, and political activist. Sometimes described as "the father of modern linguistics," Chomsky is also one of the founders of the field of cognitive science. He is the author of over 100 books on topics such as linguistics, war, politics, and mass media. Ideologically, he aligns with anarcho-syndicalism and libertarian socialism. He holds a joint appointment as Institute Professor Emeritus at the Massachusetts Institute of Technology (MIT) and laureate professor at the University of Arizona.[22][23]
@@ -52,6 +65,12 @@ subtest 'Summarize Each - Structure Intact' => sub { summary_test(@each_summ) };
 subtest 'Summarize File - Structure Intact' => sub { summary_test($file_summ) };
 subtest 'Summarize Text - Structure Intact' => sub { summary_test($text_summ) };
 
+my @each_scan = $summarizer->scan_each();
+my $file_scan = $summarizer->scan_file("articles/17900108-Washington.txt");
+my $text_scan = $summarizer->scan_text($some_text);
 
+subtest 'Scan Each - Structure Intact' => sub { scanner_test(@each_summ) };
+subtest 'Scan File - Structure Intact' => sub { scanner_test($file_summ) };
+subtest 'Scan Text - Structure Intact' => sub { scanner_test($text_summ) };
 
 done_testing();
