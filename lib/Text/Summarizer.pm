@@ -804,12 +804,21 @@ Text::Summarizer - Summarize Bodies of Text
 
 	use Text::Summarizer;
 	
-	my $summarizer = Text::Summarizer->new(
-							print_scanner => 1,
-							print_summary => 1,
-							store_scanner => 1,
-						);
+	# all constructor arguments shown are OPTIONAL and reflect the DEFAULT VALUES of each attribute
+	$summarizer = Text::Summarizer->new(
+		articles_path  => 'articles/*',
+		permanent_path => 'data/permanent.stop',
+		stopwords_path => 'data/stopwrods.stop',
+		store_scanner  => 0,
+		print_scanner  => 0,
+		print_summary  => 0,
+		return_count   => 20,
+		phrase_thresh  => 2,
+		phrase_radius  => 5,
+		freq_constant  => 0.004,
+	);
 	
+	$summarizer = Text::Summarizer->new();
 		# to summarize a string
 	$stopwords = $summarizer->scan_text( 'this is a sample text' );
 	$summary   = $summarizer->summ_text( 'this is a sample text' );
@@ -817,8 +826,8 @@ Text::Summarizer - Summarize Bodies of Text
 	$stopwords = $summarizer->scan_file("some/file.txt");
 	$summary   = $summarizer->summ_file("some/file.txt");
 		# or to summarize in bulk
-	@stopwords = $summarizer->scan_each("/directory/glob/*");
-	@summaries = $summarizer->summ_each("/directory/glob/*");
+	@stopwords = $summarizer->scan_each("/directory/glob/*");  # if no argument provided, uses the 'articles_path' attribute
+	@summaries = $summarizer->summ_each("/directory/glob/*");  # if no argument provided, uses the 'articles_path' attribute
 
 
 
@@ -965,9 +974,9 @@ list of proceedurally generated stopwords, derived by the `scan` function
 
 Scan is a utility that allows the Text::Summarizer to parse through a body of text to find words that occur with unusually high frequency. These words are then stored as new stopwords via the provided C<< stopwords_path >>. Additionally, calling any of the three C<< scan_[...] >> subroutines will return a reference (or array of references) to an unordered list containing the new stopwords.
 
-	$new_stopwords = $summarizer->scan_text( 'this is a sample text' );
-	$new_stopwords = $summarizer->scan_file( 'some/file/path.txt' );
-	@new_stopwords = $summarizer->scan_each( 'some/directory/*' );
+	$stopwords = $summarizer->scan_text( 'this is a sample text' );
+	$stopwords = $summarizer->scan_file( 'some/file/path.txt' );
+	@stopwords = $summarizer->scan_each( 'some/directory/*' );  # if no argument provided, uses the 'articles_path' attribute
 
 =head2 C<summarize>
 
@@ -977,11 +986,11 @@ There are three provided functions for summarizing text documents.
 
 	$summary   = $summarizer->summarize_text( 'this is a sample text' );
 	$summary   = $summarizer->summarize_file( 'some/file/path.txt' );
-	@summaries = $summarizer->summarize_each( 'some/directory/*' );
+	@summaries = $summarizer->summarize_each( 'some/directory/*' );  # if no argument provided, defaults to the 'articles_path' attribute
 		# or their short forms
 	$summary   = $summarizer->summ_text('...');
 	$summary   = $summarizer->summ_file('...');
-	@sumamries = $summarizer->summ_each('...');
+	@sumamries = $summarizer->summ_each('...');  # if no argument provided, defaults to the 'articles_path' attribute
 
 C<< summarize_text >> and C<< summarize_file >> each return a summary hash-ref containing three array-refs, while C<< summarize_each >> returns a list of these hash-refs. These summary hashes take the following form:
 
