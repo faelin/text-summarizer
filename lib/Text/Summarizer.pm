@@ -213,7 +213,7 @@ sub _store_stopwords {
 	my $self = shift;
 
 	open( my $stopwords_file, ">", $self->stopwords_path)
-		or die "Can't open stopwords scanner file " . $self->stopwords_file . ": $!";
+		or die "Can't open stopwords scanner file " . $self->stopwords_path . ": $!";
 	grep { print $stopwords_file "$_\n" } sort keys %{$self->watchlist} if $self->store_scanner;
 	close $stopwords_file;
 
