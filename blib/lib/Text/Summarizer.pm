@@ -4,7 +4,7 @@ use v5.10.0;
 use strict;
 use warnings;
 use Moo;
-use Types::Standard qw/ Ref Str Int Num InstanceOf Bool /;
+use Types::Standard qw/ Bool Ref Str Int Num InstanceOf Bool /;
 use List::AllUtils qw/ max min sum sum0 singleton /;
 use Algorithm::CurveFit;
 use utf8;
@@ -18,7 +18,7 @@ require Exporter;
 @EXPORT = qw();
 @EXPORT_OK = qw();
 %EXPORT_TAGS = (all => [@EXPORT_OK]);
-$VERSION = '1.052';
+$VERSION = '1.053';
 
 
 has permanent_path => (
@@ -39,16 +39,22 @@ has articles_path => (
 	default => 'articles/*'
 );
 
+has store_scanner => (
+	is => 'rw',
+	isa => Bool,
+	default => 0,
+);
+
 has print_scanner => (
 	is => 'rw',
-	isa => Str,
-	default => 0
+	isa => Bool,
+	default => 0,
 );
 
 has print_summary => (
 	is => 'rw',
-	isa => Str,
-	default => 0
+	isa => Bool,
+	default => 0,
 );
 
 has return_count => (
@@ -89,6 +95,7 @@ has stopwords => (
 has watchlist => (
 	is => 'rwp',
 	isa => Ref['HASH'],
+	lazy => 1,
 );
 
 has article_length => (
@@ -173,17 +180,29 @@ has text_hint => (
 	isa => Str,
 );
 
+sub _build_watchlist {
+	my $self = shift;
+	my %watchlist;
+
+	open( my $stopwords_file, '<', $self->stopwords_path )
+		or die "Can't open stopwords scanner file" . $self->stopwords_path . ": $!";
+	chomp and $watchlist{ $_ } = 1 for (<$stopwords_file>);
+	close $stopwords_file;
+
+	return \%watchlist;
+}
+
 sub _build_stopwords {
 	my $self = shift;
 	my %stopwords;
 
 	open( my $permanent_file, '<', $self->permanent_path )
- 		or die "Can't open " . $self->permanent_path . ": $!";
+ 		or die "Can't open stopwords permanent file " . $self->permanent_path . ": $!";
 	chomp and $stopwords{ $_ } = 1 for (<$permanent_file>);
 	close $permanent_file;
 
 	open( my $stopwords_file, '<', $self->stopwords_path )
-		or die "Can't open " . $self->stopwords_path . ": $!";
+		or die "Can't open stopwords scanner file" . $self->stopwords_path . ": $!";
 	chomp and $stopwords{ $_ } = 1 for (<$stopwords_file>);
 	close $stopwords_file;
 
@@ -193,9 +212,9 @@ sub _build_stopwords {
 sub _store_stopwords {
 	my $self = shift;
 
-	open( my $stopwords_file, ">>", $self->stopwords_path)
-		or die "Can't open $self->stopwords_file: $!";
-	#print $stopwords_file "$_\n" for sort keys %{$self->stopwords};
+	open( my $stopwords_file, ">", $self->stopwords_path)
+		or die "Can't open stopwords scanner file " . $self->stopwords_file . ": $!";
+	grep { print $stopwords_file "$_\n" } sort keys %{$self->watchlist} if $self->store_scanner;
 	close $stopwords_file;
 
 	return $self;
@@ -235,7 +254,7 @@ sub scan_file {
 	my ($self, $file_path) = @_;
 
 	open( my $file, '<:encoding(UTF-8)', $file_path )
-		or die "Can't open $file_path: $!";
+		or die "Can't open file $file_path for scanning: $!";
 
 	return $self->scan_text( $file, $file_path );
 }
@@ -278,7 +297,7 @@ sub summarize_file {
 	my ($self, $file_path) = @_;
 
 	open( my $file, '<:encoding(UTF-8)', $file_path )
-		or die "Can't open $file_path: $!";
+		or die "Can't open file $file_path for summarizing: $!";
 
 	return $self->summarize_text( $file, $file_path );
 }
@@ -287,6 +306,12 @@ sub summarize_each {
 	my ($self, $dir_path) = @_;
 	return map { $self->summarize_file( $_ ) } glob( $dir_path // $self->articles_path );
 }
+
+
+
+sub summ_text { return shift->summarize_text(@_); }
+sub summ_file { return shift->summarize_file(@_); }
+sub summ_each { return shift->summarize_each(@_); }
 
 
 
@@ -765,9 +790,15 @@ __END__
  
 =encoding utf-8
 
+
+
+
 =head1 NAME
 
 Text::Summarizer - Summarize Bodies of Text
+
+
+
 
 =head1 SYNOPSIS
 
@@ -775,15 +806,25 @@ Text::Summarizer - Summarize Bodies of Text
 	
 	my $summarizer = Text::Summarizer->new( print_scanner => 1, print_summary => 1 );
 	
-	my $new_words = $summarizer->scan_file("some/file.txt");
-	my $summary   = $summarizer->summarize_file("some/file.txt");
-		# or if you want to process in bulk
-	my @new_words = $summarizer->scan_each("/directory/path/*");
-	my @summaries = $summarizer->summarize_each("/directory/path/*");
+		# to summarize a string
+	$new_words = $summarizer->scan_text( 'this is a sample text' );
+	$summary   = $summarizer->summ_text( 'this is a sample text' );
+	    # or to summarize an entire file
+	$new_words = $summarizer->scan_file("some/file.txt");
+	$summary   = $summarizer->summ_file("some/file.txt");
+		# or to summarize in bulk
+	@new_words = $summarizer->scan_each("/directory/glob/*");
+	@summaries = $summarizer->summ_each("/directory/glob/*");
+
+
+
 
 =head1 DESCRIPTION
 
 This module allows you to summarize bodies of text into a scored hash of  I<sentences>,  I<phrase-fragments>, and  I<individual words> from the provided text. These scores reflect the weight (or precedence) of the relative text-fragments, i.e. how well they summarize or reflect the overall nature of the text. All of the sentences and phrase-fragments are drawn from within the existing text, and are NOT proceedurally generated.
+
+
+
 
 =head1 ATTRIBUTES
 
@@ -791,17 +832,21 @@ B< The following constructor attributes are available to the user, and can be ac
 
 =over 8
 
+=item C<articles_path>   – [directory]
+
+folder containing some text-files you wish to summarize
+
 =item C<permanent_path>  – [filepath]
 
 file containing a base set of universal stopwords (defaults to English stopwords)
 
 =item C<stopwords_path>  – [filepath]
 
-file containing a list of new stopwords identified by the C<< scan >> function
+file containing a list of new stopwords identified by the C<scan> function
 
-=item C<articles_path>   – [directory]
+=item C<store_scanner>   – [boolean]
 
-folder containing some text-files you wish to summarize
+flag for storing new stopwords in the file indicated by C<stopwords_path>
 
 =item C<print_scanner>   – [boolean]
 
@@ -894,7 +939,17 @@ brief snippet of text containing the first 50 and the final 30 characters of the
 
 scored lists of each summary sentence, each chosen scrap, and each frequently-occuring word
 
+=item C<stopwords> - [hash-ref]
+
+list of all stopwords, both permanent and proceedural
+
+=item C<watchlist> - [hash-ref]
+
+list of proceedurally generated stopwords, derived by the `scan` function
+
 =back
+
+
 
 
 =head1 FUNCTIONS
@@ -903,7 +958,7 @@ scored lists of each summary sentence, each chosen scrap, and each frequently-oc
 
 Scan is a utility that allows the Text::Summarizer to parse through a body of text to find words that occur with unusually high frequency. These words are then stored as new stopwords via the provided C<< stopwords_path >>. Additionally, calling any of the three C<< scan_[...] >> subroutines will return a reference (or array of references) to an unordered list containing the new stopwords.
 
-	$new_words     = $summarizer->scan_text( 'this is a sample text' )
+	$new_words     = $summarizer->scan_text( 'this is a sample text' );
 	$new_words     = $summarizer->scan_file( 'some/file/path.txt' );
 	@arr_new_words = $summarizer->scan_each( 'some/directory/*' );
 
@@ -913,9 +968,13 @@ Summarizing is, not surprisingly, the heart of the Text::Summarizer. Summarizing
 
 There are three provided functions for summarizing text documents.
 
-	$summary   = $summarizer->summarize_text( 'this is a sample text' )
+	$summary   = $summarizer->summarize_text( 'this is a sample text' );
 	$summary   = $summarizer->summarize_file( 'some/file/path.txt' );
 	@summaries = $summarizer->summarize_each( 'some/directory/*' );
+		# or their short forms
+	$summary   = $summarizer->summ_text('...');
+	$summary   = $summarizer->summ_file('...');
+	@sumamries = $summarizer->summ_each('...');
 
 C<< summarize_text >> and C<< summarize_file >> each return a summary hash-ref containing three array-refs, while C<< summarize_each >> returns a list of these hash-refs. These summary hashes take the following form:
 
@@ -923,17 +982,20 @@ C<< summarize_text >> and C<< summarize_file >> each return a summary hash-ref c
 
 =item *
 
-C<B<sentences>> => a list of full sentences from the given text, with composite scores of the words contained therein
+C<sentences> => a list of full sentences from the given text, with composite scores of the words contained therein
 
 =item *
 
-C<B<fragments>> => a list of phrase fragments from the given text, scored similarly to sentences
+C<fragments> => a list of phrase fragments from the given text, scored similarly to sentences
 
 =item *
 
-C<B<words>>     => a list of all words in the text, scored by a three-factor system consisting of  I<frequency of appearance>,  I<population standard deviation>, and  I<use in important phrase fragments>.
+C<words>     => a list of all words in the text, scored by a three-factor system consisting of  I<frequency of appearance>,  I<population standard deviation>, and  I<use in important phrase fragments>.
 
 =back
+
+
+
 
 =head3 About Fragments
 
@@ -971,6 +1033,9 @@ when multiple fragments are equivalent (i.e. they consist of the same list of to
 
 =back
 
+
+
+
 =head1 SUPPORT
 
 Bugs should always be submitted via the project hosting bug tracker
@@ -979,13 +1044,22 @@ L<https://github.com/faelin/text-summarizer/issues>
 
 For other issues, contact the maintainer.
 
+
+
+
 =head1 AUTHOR
 
 Faelin Landy <faelin.landy@gmail.com> (current maintainer)
 
+
+
+
 =head1 CONTRIBUTORS
 
 * Michael McClennen <michaelm@umich.edu>
+
+
+
 
 =head1 COPYRIGHT AND LICENSE
 

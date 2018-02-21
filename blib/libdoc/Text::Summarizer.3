@@ -143,11 +143,15 @@ Text::Summarizer \- Summarize Bodies of Text
 \&        
 \&        my $summarizer = Text::Summarizer\->new( print_scanner => 1, print_summary => 1 );
 \&        
-\&        my $new_words = $summarizer\->scan_file("some/file.txt");
-\&        my $summary   = $summarizer\->summarize_file("some/file.txt");
-\&                # or if you want to process in bulk
-\&        my @new_words = $summarizer\->scan_each("/directory/path/*");
-\&        my @summaries = $summarizer\->summarize_each("/directory/path/*");
+\&                # to summarize a string
+\&        $new_words = $summarizer\->scan_text( \*(Aqthis is a sample text\*(Aq );
+\&        $summary   = $summarizer\->summ_text( \*(Aqthis is a sample text\*(Aq );
+\&            # or to summarize an entire file
+\&        $new_words = $summarizer\->scan_file("some/file.txt");
+\&        $summary   = $summarizer\->summ_file("some/file.txt");
+\&                # or to summarize in bulk
+\&        @new_words = $summarizer\->scan_each("/directory/glob/*");
+\&        @summaries = $summarizer\->summ_each("/directory/glob/*");
 .Ve
 .SH "DESCRIPTION"
 .IX Header "DESCRIPTION"
@@ -155,6 +159,10 @@ This module allows you to summarize bodies of text into a scored hash of  \fIsen
 .SH "ATTRIBUTES"
 .IX Header "ATTRIBUTES"
 \&\fB The following constructor attributes are available to the user, and can be accessed/modified at any time via \f(CB\*(C`$summarizer\->_set_[attribute]\*(C'\fB \fR:
+.ie n .IP """articles_path""   X [directory]" 8
+.el .IP "\f(CWarticles_path\fR   X [directory]" 8
+.IX Item "articles_path X [directory]"
+folder containing some text-files you wish to summarize
 .ie n .IP """permanent_path""  X [filepath]" 8
 .el .IP "\f(CWpermanent_path\fR  X [filepath]" 8
 .IX Item "permanent_path X [filepath]"
@@ -163,10 +171,10 @@ file containing a base set of universal stopwords (defaults to English stopwords
 .el .IP "\f(CWstopwords_path\fR  X [filepath]" 8
 .IX Item "stopwords_path X [filepath]"
 file containing a list of new stopwords identified by the \f(CW\*(C`scan\*(C'\fR function
-.ie n .IP """articles_path""   X [directory]" 8
-.el .IP "\f(CWarticles_path\fR   X [directory]" 8
-.IX Item "articles_path X [directory]"
-folder containing some text-files you wish to summarize
+.ie n .IP """store_scanner""   X [boolean]" 8
+.el .IP "\f(CWstore_scanner\fR   X [boolean]" 8
+.IX Item "store_scanner X [boolean]"
+flag for storing new stopwords in the file indicated by \f(CW\*(C`stopwords_path\*(C'\fR
 .ie n .IP """print_scanner""   X [boolean]" 8
 .el .IP "\f(CWprint_scanner\fR   X [boolean]" 8
 .IX Item "print_scanner X [boolean]"
@@ -253,6 +261,14 @@ brief snippet of text containing the first 50 and the final 30 characters of the
 .el .IP "\f(CWsummary\fR X [hash\-ref]" 8
 .IX Item "summary X [hash-ref]"
 scored lists of each summary sentence, each chosen scrap, and each frequently-occuring word
+.ie n .IP """stopwords"" \- [hash\-ref]" 8
+.el .IP "\f(CWstopwords\fR \- [hash\-ref]" 8
+.IX Item "stopwords - [hash-ref]"
+list of all stopwords, both permanent and proceedural
+.ie n .IP """watchlist"" \- [hash\-ref]" 8
+.el .IP "\f(CWwatchlist\fR \- [hash\-ref]" 8
+.IX Item "watchlist - [hash-ref]"
+list of proceedurally generated stopwords, derived by the `scan` function
 .SH "FUNCTIONS"
 .IX Header "FUNCTIONS"
 .ie n .SS """scan"""
@@ -261,7 +277,7 @@ scored lists of each summary sentence, each chosen scrap, and each frequently-oc
 Scan is a utility that allows the Text::Summarizer to parse through a body of text to find words that occur with unusually high frequency. These words are then stored as new stopwords via the provided \f(CW\*(C`stopwords_path\*(C'\fR. Additionally, calling any of the three \f(CW\*(C`scan_[...]\*(C'\fR subroutines will return a reference (or array of references) to an unordered list containing the new stopwords.
 .PP
 .Vb 3
-\&        $new_words     = $summarizer\->scan_text( \*(Aqthis is a sample text\*(Aq )
+\&        $new_words     = $summarizer\->scan_text( \*(Aqthis is a sample text\*(Aq );
 \&        $new_words     = $summarizer\->scan_file( \*(Aqsome/file/path.txt\*(Aq );
 \&        @arr_new_words = $summarizer\->scan_each( \*(Aqsome/directory/*\*(Aq );
 .Ve
@@ -272,19 +288,23 @@ Summarizing is, not surprisingly, the heart of the Text::Summarizer. Summarizing
 .PP
 There are three provided functions for summarizing text documents.
 .PP
-.Vb 3
-\&        $summary   = $summarizer\->summarize_text( \*(Aqthis is a sample text\*(Aq )
+.Vb 7
+\&        $summary   = $summarizer\->summarize_text( \*(Aqthis is a sample text\*(Aq );
 \&        $summary   = $summarizer\->summarize_file( \*(Aqsome/file/path.txt\*(Aq );
 \&        @summaries = $summarizer\->summarize_each( \*(Aqsome/directory/*\*(Aq );
+\&                # or their short forms
+\&        $summary   = $summarizer\->summ_text(\*(Aq...\*(Aq);
+\&        $summary   = $summarizer\->summ_file(\*(Aq...\*(Aq);
+\&        @sumamries = $summarizer\->summ_each(\*(Aq...\*(Aq);
 .Ve
 .PP
 \&\f(CW\*(C`summarize_text\*(C'\fR and \f(CW\*(C`summarize_file\*(C'\fR each return a summary hash-ref containing three array-refs, while \f(CW\*(C`summarize_each\*(C'\fR returns a list of these hash-refs. These summary hashes take the following form:
 .IP "\(bu" 8
-\&\f(CW\*(C`\f(CBsentences\f(CW\*(C'\fR => a list of full sentences from the given text, with composite scores of the words contained therein
+\&\f(CW\*(C`sentences\*(C'\fR => a list of full sentences from the given text, with composite scores of the words contained therein
 .IP "\(bu" 8
-\&\f(CW\*(C`\f(CBfragments\f(CW\*(C'\fR => a list of phrase fragments from the given text, scored similarly to sentences
+\&\f(CW\*(C`fragments\*(C'\fR => a list of phrase fragments from the given text, scored similarly to sentences
 .IP "\(bu" 8
-\&\f(CW\*(C`\f(CBwords\f(CW\*(C'\fR     => a list of all words in the text, scored by a three-factor system consisting of  \fIfrequency of appearance\fR,  \fIpopulation standard deviation\fR, and  \fIuse in important phrase fragments\fR.
+\&\f(CW\*(C`words\*(C'\fR     => a list of all words in the text, scored by a three-factor system consisting of  \fIfrequency of appearance\fR,  \fIpopulation standard deviation\fR, and  \fIuse in important phrase fragments\fR.
 .PP
 \fIAbout Fragments\fR
 .IX Subsection "About Fragments"

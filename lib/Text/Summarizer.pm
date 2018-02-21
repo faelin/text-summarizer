@@ -18,7 +18,7 @@ require Exporter;
 @EXPORT = qw();
 @EXPORT_OK = qw();
 %EXPORT_TAGS = (all => [@EXPORT_OK]);
-$VERSION = '1.053';
+$VERSION = '1.054';
 
 
 has permanent_path => (
@@ -804,16 +804,20 @@ Text::Summarizer - Summarize Bodies of Text
 
 	use Text::Summarizer;
 	
-	my $summarizer = Text::Summarizer->new( print_scanner => 1, print_summary => 1 );
+	my $summarizer = Text::Summarizer->new(
+							print_scanner => 1,
+							print_summary => 1,
+							store_scanner => 1,
+						);
 	
 		# to summarize a string
-	$new_words = $summarizer->scan_text( 'this is a sample text' );
+	$stopwords = $summarizer->scan_text( 'this is a sample text' );
 	$summary   = $summarizer->summ_text( 'this is a sample text' );
 	    # or to summarize an entire file
-	$new_words = $summarizer->scan_file("some/file.txt");
+	$stopwords = $summarizer->scan_file("some/file.txt");
 	$summary   = $summarizer->summ_file("some/file.txt");
 		# or to summarize in bulk
-	@new_words = $summarizer->scan_each("/directory/glob/*");
+	@stopwords = $summarizer->scan_each("/directory/glob/*");
 	@summaries = $summarizer->summ_each("/directory/glob/*");
 
 
@@ -827,6 +831,8 @@ This module allows you to summarize bodies of text into a scored hash of  I<sent
 
 
 =head1 ATTRIBUTES
+
+X< read-write accessible >
 
 B< The following constructor attributes are available to the user, and can be accessed/modified at any time via C<< $summarizer->_set_[attribute] >> >:
 
@@ -874,6 +880,7 @@ mathematical constant for establishing minimum threshold of occurence for freque
 
 =back
 
+X< read only >
 
 B< These attributes are read-only, and can be accessed via C<< $summarizer->[attribute] >> >:
 
@@ -958,9 +965,9 @@ list of proceedurally generated stopwords, derived by the `scan` function
 
 Scan is a utility that allows the Text::Summarizer to parse through a body of text to find words that occur with unusually high frequency. These words are then stored as new stopwords via the provided C<< stopwords_path >>. Additionally, calling any of the three C<< scan_[...] >> subroutines will return a reference (or array of references) to an unordered list containing the new stopwords.
 
-	$new_words     = $summarizer->scan_text( 'this is a sample text' );
-	$new_words     = $summarizer->scan_file( 'some/file/path.txt' );
-	@arr_new_words = $summarizer->scan_each( 'some/directory/*' );
+	$new_stopwords = $summarizer->scan_text( 'this is a sample text' );
+	$new_stopwords = $summarizer->scan_file( 'some/file/path.txt' );
+	@new_stopwords = $summarizer->scan_each( 'some/directory/*' );
 
 =head2 C<summarize>
 
@@ -997,7 +1004,7 @@ C<words>     => a list of all words in the text, scored by a three-factor system
 
 
 
-=head3 About Fragments
+=head3 (note about fragments)
 
 Phrase fragments are in actuality short "scraps" of text (usually only two or three words) that are derived from the text via the following process:
 
