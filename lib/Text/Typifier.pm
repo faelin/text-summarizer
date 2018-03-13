@@ -25,11 +25,6 @@ my $sen_init = qr/(?= [$lt_brack]? ["“]? [A-Z0-9] )/ux;
 	#SENTENCE INITIATOR: detects beginning of a sentence (zero-width assertion)
 my $sen_term = qr/[\.?!‽…⋯᠁]+  (?(?=["”]) (?: ["”](?= \h+ $sen_init )|(?:["”]\v))    |    [$rt_brack]?(?=(?:\s $sen_init )|\v|$))/ux;
 	#SENTENCE TERMINATOR: matches any number of   [.?!] with optional final ["”]   followed by a new sentence or [\v] or the end of the block
-my $line_term = qr/(?= \v+ | \Z )/ux;
-	#LINE TERMINATOR: detects the end of a single line or the end of the entire text (zero-width assertion)
-
-my $indented = qr/^ \h+ \w++ \V+/ux;
-	#matches any single indented line of text
 
 my $flat_clause = qr/\w++   (?! [$rt_brack\.] \h+ )   (?> \h*[^$delineator,\s]+)*+/ux;
 	#matches a grouping of words that    DOES NOT begin with a bullet    and    DOES NOT include [delineator] or [,]
@@ -51,11 +46,10 @@ my $sentence = qr/(?| $sentence_list   |   $complex_clause (?: [$delineator,] \h
 my $paragraph = qr/$sentence (?: \s+ $sentence)++/ux;
     #one or more   [sentence]   delineated by whitespace
 
-my $title = qr//ux;
-my $dateline = qr//ux;
+my $title = qr/(*FAIL)/ux;
+my $dateline = qr/(*FAIL)/ux;
 
-my $dialog = qr//ux;
-
+my $dialog = qr/(*FAIL)/ux;
 
 
 #THE FOLLOWING ARE PARAGRAPH-MATCHING BLOCKS FOR USE WHEN SEPARATING ADJACENT PARAGRAPHS WITHIN A TEXT
@@ -64,9 +58,9 @@ my $block_list = qr/(?P<list>
 
 						(?P<item>
 							(?P<open>    [$lt_brack] (?P<space> \h+ )?   )?
-							(?:    (?P<char>   (?P<alpha> [A-Za-z]+)  |  (?P<numer> \d+))  ([$delineator,]?\w+)*    |    (?P<bullet> [^$lt_brack\w\s]++)  )
-							(?P<close>     (?(<open>)    (?(<space>) \h+ | )  [$rt_brack]    |    (?(<char>)  (?:[$rt_brack]  |  \h*[$delineator,] )  |  )    )     )
-							\h*+ .+
+							(?:    (?P<char>   (?P<alpha> [A-Za-z]++)  |  (?P<numer> \d++))  ([$delineator,]?\w+)*+    |    (?P<bullet> [^$lt_brack\w\s]++)  )
+							(?P<close>     (?(<open>)    (?(<space>) \h+ | )  [$rt_brack]    |    (?(<char>)  (?:[$rt_brack]  |  \h*[$delineator,] )  |  )    ))
+							\h* .+
 						)
 
 						(?P<line>
@@ -76,58 +70,67 @@ my $block_list = qr/(?P<list>
 								(?(<char>)   (?(<alpha>) [A-Za-z]+ | \d+ )([$delineator,]?\w+)*    |    (?: (?P=bullet)|(*FAIL) ))
 								(?P=close)
 							)
-							\h*+ .+
+							\h* .+
 						)*
-					)/x;
-my $indent_par = qr/$indented   $sen_term   $line_term/x;
-my $offset_block = qr/$indented  (?: \v $indented)+  $line_term/x;
-my $block_par = qr/(?: ^ \w+ \W \V+)  $line_term/x;
-my $catch_all = qr/.+[\V]/x;
+					)/ux;
+my $offset_block = qr/\h+ \V+  (?: \v ^ \h+ \w++ \V+)++/ux;
+my $block_par = qr/(?: (?!\h) \V+ (?: \v (?!\h) \V+)*+ )/ux;
+my $indent_par = qr/\h+ \V+  (?: \v (?!\h) \V+ | (?=\v(?:\v|\h|\Z)) )++/ux;
+my $catch_all = qr/\h* \V+/ux;
 
 
+my $paragraph_match = qr/( ^
+						  (?: (?: $block_list )
+						    | (?: $offset_block )
+						    | (?: $block_par )
+						    | (?: $indent_par )
+						    | (?: $catch_all )
+						  )
+						  (?: \v{2,} | \v (?=\h) | \Z)
+						)/mux;
 
 
 my %formats = (
 	#partial sentence
-	clause => $flat_clause,
+	clause => qr/$flat_clause/,
 
 	#list of three or more items, delineated by [,;]
-	linear_list => $linear_list,
+	linear_list => qr/$linear_list/,
 
 	#one or more clauses, ending in   [:]   followed by a [linear_list]
-	sentence_list => $sentence_list,
+	sentence_list => qr/$sentence_list/,
 
 	#single alphanumeric chain followed by a delineating symbol    or    symbol followed by [\s]
-	block_list => $block_list,
+	block_list => qr/$block_list/,
 
 	#single complete sentence, must end in   [.?!]   or   ["”] followed by [\s][A-Z] or end of text
-	sentence => $sentence,
+	sentence => qr/^$sentence$/,
 
 	#one or more sentences, optionally ending in [:]
-	paragraph => $paragraph,
+	paragraph => qr/$paragraph/,
 
 	#sentence preceded by     one word or more words followed by a delineating symbol or [\s]
-	dialog => $dialog,
+	dialog => qr/$dialog/,
 
 	#fragment containing a date- or time-stamp
-	dateline => $dateline,
+	dateline => qr/$dateline/,
 
 	#fragment in all capitals or with trailing vertical whitespace
-	title => $title,
+	title => qr/$title/,
 );
 
 
-
+use Benchmark ':hireswallclock';
 
 sub separate {
-	my $text = shift;
-	my $paragraph_match = qr/(?| $block_list
-							   | $indent_par
-							   | $offset_block
-							   | $block_par
-							   | $catch_all
-							)/mx;
-	my @paragraphs = $text =~ m/$paragraph_match/g; #splits *text* into an array of paragraphs
+	my $text  = shift;
+	my @paragraphs;
+
+	my $t0 = Benchmark->new;
+	push @paragraphs => $1 while $text =~ m/$paragraph_match/gmuxs; #splits *text* into an array of paragraphs
+	my $t1 = Benchmark->new;
+	my $td = timediff($t1, $t0);
+	say "Article took ",timestr($td);
 
 	return @paragraphs;
 }
@@ -139,21 +142,25 @@ sub typify {
 	my @paragraphs = separate $text;
 
 	my @category;
-	PARAGRAPH: for $text (@paragraphs) {
+	PARAGRAPH: for my $chunk (@paragraphs) {
 		my @type;
 
 		TEST: for my $format (keys %formats) {
-			if ( $text =~ qr/^$formats{ $format }$/ ) {
+			my $pattern = $formats{ $format };
+
+			if ( $chunk =~ qr/$pattern/muxs ) {
 				push @type => $format;
-			} else {
-				push @type => 'fragment';
 			}
 		}
-
+		push @type => 'fragment' unless scalar @type;
 		push @category => \@type;
 	}
 
-	return zip @paragraphs, @category;
+	my @zipped = zip @paragraphs, @category;
+
+			$DB::single = 1;
+
+	return @zipped;
 }
 
 
