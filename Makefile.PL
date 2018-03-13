@@ -5,10 +5,12 @@ WriteMakefile
   'INSTALLDIRS' => 'site',
   'EXE_FILES' => [],
   'PREREQ_PM' => {
-                   'Types::Standard' => 0,
                    'Moo' => 0,
+                   'Types::Standard' => 0,
+                   'List::AllUtils' => 0,
                    'Algorithm::CurveFit' => 0,
-                   'List::AllUtils' => 0
+                   'Statistics::Basic' => 0,
+                   'Text::Typifier' => 0,
                  },
   'VERSION_FROM' => 'lib/Text/Summarizer.pm',
   'PL_FILES' => {},

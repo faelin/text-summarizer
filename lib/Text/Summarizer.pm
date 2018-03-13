@@ -1,12 +1,13 @@
 package Text::Summarizer;
 
-use v5.10.0;
+use v5.14;
 use strict;
 use warnings;
 use Moo;
 use Types::Standard qw/ Bool Ref Str Int Num InstanceOf Bool /;
 use List::AllUtils qw/ max min sum sum0 singleton /;
 use Algorithm::CurveFit;
+use Text::Typifier qw/ typify /;
 use utf8;
 
 binmode STDOUT, ':encoding(UTF-8)';
@@ -18,7 +19,7 @@ require Exporter;
 @EXPORT = qw();
 @EXPORT_OK = qw();
 %EXPORT_TAGS = (all => [@EXPORT_OK]);
-$VERSION = '1.054';
+$VERSION = '1.055';
 
 
 has permanent_path => (
@@ -108,6 +109,11 @@ has article_length => (
 has full_text => (
 	is => 'rwp',
 	isa => Str,
+);
+
+has paragraphs => (
+	is => 'rwp',
+	isa => Ref['ARRAY'],
 );
 
 has sentences => (
@@ -307,8 +313,6 @@ sub summarize_each {
 	return map { $self->summarize_file( $_ ) } glob( $dir_path // $self->articles_path );
 }
 
-
-
 sub summ_text { return shift->summarize_text(@_); }
 sub summ_file { return shift->summarize_file(@_); }
 sub summ_each { return shift->summarize_each(@_); }
@@ -318,11 +322,12 @@ sub summ_each { return shift->summarize_each(@_); }
 sub tokenize {
 	my ( $self, $text ) = @_;
 
-	my $full_text = $text;
-		#contains the full body of text
-	my @sentences = split qr/(?|   (?<=(?<!\s[A-Z][a-z]) (?<!\s[A-Z][a-z]{2}) \. (?![A-Z0-9]\.|\s[a-z0-9]) | \! | \?) (?:(?=[A-Z])|\s+)
+	my @paragraphs = typify $text;
+
+	my $sentence_match = qr/(?|   (?<=(?<!\s[A-Z][a-z]) (?<!\s[A-Z][a-z]{2}) \. (?![A-Z0-9]\.|\s[a-z0-9]) | \! | \?) (?:(?=[A-Z])|\s+) 
 							   |   (?: \n+ | ^\s+ | \s+$ )
-							)/mx => $full_text;
+							)/mx;
+	my @sentences = split /$sentence_match/ => $text;
 		# array of sentences
 
 	my @word_list;  # array literal of all the words in the entire text body
@@ -336,10 +341,11 @@ sub tokenize {
 	$self->_set_article_length( scalar @word_list ); 
 		#counts the total number of words in the article
 
-	$self->_set_full_text( $full_text  );
+	$self->_set_full_text( $text  );
 	$self->_set_sentences( \@sentences );
 	$self->_set_word_list( \@word_list );
 	$self->_set_sen_words( \@sen_words );
+	$self->_set_paragraphs( \@paragraphs);
 
 	return $self;
 }
@@ -367,10 +373,10 @@ sub _build_clst_hash {
 
 	my (%cluster_hash, %cluster_count);
 	my $abs_pos = 0;
-	for my $sen_index (0..scalar @{$self->sentences} - 1) { #gives the index of each sentence in the article
+	for my $sen_index (0..$#{$self->sentences}) { #gives the index of each sentence in the article
 		my @sen_words = @{$self->sen_words->[$sen_index]}; # creates an array of each word in the given sentence
 		
-		for my $position (0..scalar @sen_words - 1) { #iterates across each word in the sentence
+		for my $position (0..$#sen_words) { #iterates across each word in the sentence
 			$abs_pos++;
 
 			if ( exists $self->freq_hash->{$sen_words[$position]}) { ## true if the given word at index *position* appears in the *freq_hash*
@@ -459,7 +465,7 @@ sub _build_frag_list {
 		my (@hash_list, %sums_hash, %words_count); #*hash_list* contains ordered, formatted lists of each word in the phrase fragment;  *sums_hash* contains the total number of times each word appears in all phrases for the given *f_word*
 		ORDER: for my $phrase (@{$self->phrs_hash->{$f_word}}) {
 			my $sentence_ref  = $phrase->[0];
-			my %ordered_words = map { $sums_hash{$phrase->[-1]->[$_]}++; ($_ => $phrase->[-1]->[$_]) } (0..scalar @{$phrase->[-1]} - 1);
+			my %ordered_words = map { $sums_hash{$phrase->[-1]->[$_]}++; ($_ => $phrase->[-1]->[$_]) } (0..$#{$phrase->[-1]});
 				# *words* contains an ordered, formatted list of each word in the given phrase fragment, looks like:
 				# 	'01' => 'some'
 				#	'02' => 'word'
@@ -487,7 +493,7 @@ sub _build_frag_list {
 			my @word_keys = sort { $a <=> $b } keys %{$word_hash->{'ordered'}}; # *word_keys* contains a series of index-values
 			for (my $i = 0; $i < scalar @word_keys; $i++ ) {
 				$curr = $word_keys[$i];
-				$next = $word_keys[$i+1] if $i < scalar @word_keys - 1; # if-statement prevents out-of-bounds error
+				$next = $word_keys[$i+1] if $i < $#word_keys; # if-statement prevents out-of-bounds error
 
 				if ( $next == $curr + 1 or $curr == $prev + 1 ) {
 					unless ($curr == $prev + 1) {  #resets *R_scrap* when the *curr* index skips over a number (i.e. a new scrap is encountered)
@@ -604,7 +610,7 @@ sub develop_stopwords {
 			say "\n---SCANNER GRAPHS---\n";
 
 			say "KNOWN:";
-			KEY: for my $index ( reverse 0..scalar @word_keys - 1 ) {
+			KEY: for my $index ( reverse 0..$#word_keys ) {
 				my $format = "%" . $longest . "s|%s\n";
 				my $score = $score_hash{$word_keys[$index]};
 
@@ -748,7 +754,7 @@ sub analyze_phrases {
 
 		say "SUMMARY:";
 		my @sentence_keys = sort { $sentences->{$b} <=> $sentences->{$a} or $a cmp $b} keys %$sentences;
-		for my $sen ( @sentence_keys[0..min($self->return_count,scalar @sentence_keys - 1)] ) {
+		for my $sen ( @sentence_keys[0..min($self->return_count,$#sentence_keys)] ) {
 			printf "%4d => %s\n" => $sentences->{$sen}, $sen;
 		}
 		say "\n";
@@ -756,7 +762,7 @@ sub analyze_phrases {
 
 		say "PHRASES:";
 		my @phrase_keys = sort { $fragments->{$b} <=> $fragments->{$a} or $a cmp $b } keys %$fragments;
-		for my $phrase ( @phrase_keys[0..min($self->return_count,scalar @phrase_keys - 1)] ) {
+		for my $phrase ( @phrase_keys[0..min($self->return_count,$#phrase_keys)] ) {
 			printf "%8d => %s\n" => $fragments->{$phrase}, $phrase;
 		} 
 		say "\n";
@@ -766,7 +772,7 @@ sub analyze_phrases {
 		my @word_keys = sort { $words->{$b} <=> $words->{$a} or $a cmp $b } keys %$words;
 		my $highest = $words->{$word_keys[0]};
 		my $longest = max map {length} @word_keys;
-		KEY: for my $word ( @word_keys[0..min($self->return_count,scalar @word_keys - 1)] ) {
+		KEY: for my $word ( @word_keys[0..min($self->return_count,$#word_keys)] ) {
 			my $format = "%" . $longest . "s|%s\n";
 			my $score = int(40*$words->{$word}/$highest);
 			printf $format => ( $word , "-" x $score ) if $score > 2;
