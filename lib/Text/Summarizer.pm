@@ -5,7 +5,7 @@ use strict;
 use warnings;
 use Moo;
 use Types::Standard qw/ Bool Ref Str Int Num InstanceOf Bool /;
-use List::AllUtils qw/ max min sum sum0 singleton /;
+use List::AllUtils qw/ max min sum sum0 singleton pairkeys /;
 use Algorithm::CurveFit;
 use Text::Typifier qw/ typify /;
 use utf8;
@@ -19,7 +19,7 @@ require Exporter;
 @EXPORT = qw();
 @EXPORT_OK = qw();
 %EXPORT_TAGS = (all => [@EXPORT_OK]);
-$VERSION = '1.055';
+$VERSION = '1.100';
 
 
 has permanent_path => (
@@ -322,7 +322,8 @@ sub summ_each { return shift->summarize_each(@_); }
 sub tokenize {
 	my ( $self, $text ) = @_;
 
-	my @paragraphs = typify $text;
+	my @types_list = typify($text);
+	my @paragraphs = pairkeys @types_list;
 
 	my $sentence_match = qr/(?|   (?<=(?<!\s[A-Z][a-z]) (?<!\s[A-Z][a-z]{2}) \. (?![A-Z0-9]\.|\s[a-z0-9]) | \! | \?) (?:(?=[A-Z])|\s+) 
 							   |   (?: \n+ | ^\s+ | \s+$ )
