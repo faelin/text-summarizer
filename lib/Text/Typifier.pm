@@ -16,38 +16,61 @@ require Exporter;
 $VERSION = '1.0';
 
 
-
 my $delineator = qr/\u002D\u2010-\u2015\u2212\uFE63\uFF0D.;:/ux;  #- ‐ ‒ – — ― ﹣ － . ; :
 my $lt_brack = qr/\[\(\{\⟨\</ux;  #[ ( { ⟨ <
 my $rt_brack = qr/\]\)\}\⟩\>/ux;  #] ) } ⟩ >
+my $month = qr/Jan(uary)? | Feb(ruary)? | Mar(ch)? | Apr(il)? | May | Jun(e)? | Jul(y)? | Aug(ust)? | Sep(tember)? | Oct(ober)? | Nov(ember)? | Dec(ember)?/ux;
+my $ordinal = qr/st | nd | rd | th/ux;
 
-my $sen_init = qr/(?= [$lt_brack]? ["“]? [A-Z0-9] )/ux;
+my $word = qr/\w++ [-\w]*+/ux;
+my $cap_word = qr/[A-Z][A-Za-z]++/ux;
+my $date = qr/(?| $month \h+ \d{1,2} $ordinal? ,? \h+ \d\d(\d\d)? 
+				| \d{1,2} $ordinal? \h+ $month ,? \h+ \d\d(\d\d)? 
+
+				| \d\d(\d\d)? \h+ $month \h+ \d{1,2} $ordinal? 
+
+				| $month \d{1,2} $ordinal?
+
+				| \d{1,2} $ordinal \h+ of \h+ $month
+
+				| \d\d \/ \d\d \/ \d\d\d\d 
+				| \d\d \- \d\d \- \d\d\d\d 
+				| \d\d \. \d\d \. \d\d\d\d 
+
+				| \d\d\d\d \/ \d\d \/ \d\d
+				| \d\d\d\d \- \d\d \- \d\d
+				| \d\d\d\d \. \d\d \. \d\d
+			)/ux;
+
+my $sen_init = qr/(?= [$lt_brack]? ["“]? (?: $cap_word|[0-9]++) )/ux;
 	#SENTENCE INITIATOR: detects beginning of a sentence (zero-width assertion)
-my $sen_term = qr/[\.?!‽…⋯᠁]+  (?(?=["”]) (?: ["”](?= \h+ $sen_init )|(?:["”]\v))    |    [$rt_brack]?(?=(?:\s $sen_init )|\v|$))/ux;
+my $sen_term = qr/[\.?!‽…⋯᠁]+  (?(?=["”]) (?: ["”](?= \h+ $sen_init )|(?:["”]\v))    |    [$rt_brack]?  (?= (?:\s+ $sen_init )|\v|[^\w\d]) )/ux;
 	#SENTENCE TERMINATOR: matches any number of   [.?!] with optional final ["”]   followed by a new sentence or [\v] or the end of the block
 
-my $flat_clause = qr/\w++   (?! [$rt_brack\.] \h+ )   (?> \h*[^$delineator,\s]+)*+/ux;
-	#matches a grouping of words that    DOES NOT begin with a bullet    and    DOES NOT include [delineator] or [,]
-my $list_clause = qr/\w++   (?! [$rt_brack\.] \h+ )   (?> \h*[^$delineator\s]+)*+/ux;
-	#matches a grouping of words that    DOES NOT begin with a bullet    and    DOES NOT include [delineator]
+my $flat_clause = qr/$word++ (?: \h+ $word)*+/ux;
+	#matches a grouping of words that
 
-my $linear_list = qr/(?: $list_clause[;]\h)++ $list_clause   |   (?: $flat_clause[,]\h)++ $flat_clause/ux;
+my $comma_clause = qr/$flat_clause ([,] \h+ $flat_clause)++/ux;
+
+my $semicolon_list = qr/(?: $comma_clause;["”]?\h+)++ $comma_clause/ux;
 	#matches several clauses in a row, delineated by   [;]   or   [,]    (n.b. clauses separated by [;] may have [,] interally)
 
-my $complex_clause = qr/$linear_list   |   $flat_clause/ux;
-	#matches either a   [linear_list]   or   [flat_clause]
+my $complex_clause = qr/$semicolon_list   |   $comma_clause  |  $flat_clause/ux;
+	#matches either a   [semicolon_list]   or   [flat_clause]
 
-my $sentence_list = qr/$complex_clause   [:]\h+   $linear_list/ux;
-	#matches any   [complex_clause]   followed by a [:]   followed by a [linear_list]
+my $sentence_list = qr/$complex_clause   [:]\h+   $complex_clause/ux;
+	#matches any   [complex_clause]   followed by a [:]   followed by a [complex_clause]
 
-my $sentence = qr/(?| $sentence_list   |   $complex_clause (?: [$delineator,] \h* $complex_clause)++)      (?: $sen_term)/ux;
+my $bracket_clause = qr/[$lt_brack] (?: $complex_clause | $sentence_list | (?R) )  [$rt_brack]/ux;
+
+my $sentence = qr/(?| $sentence_list     |     (?: $complex_clause   (?: [$delineator,] \h* (?: $complex_clause|$sentence_list)?)++)  )      (?: $sen_term|  :(?=\v) )/ux;
     #matches either   a [sentence_list] followed by a sentence terminator   or   one or more delineated [complex_clause] followed by a sentence terminator
 
 my $paragraph = qr/$sentence (?: \s+ $sentence)++/ux;
     #one or more   [sentence]   delineated by whitespace
-
+my $name = qr/(?: (?: $cap_word \h | [A-Z]\. \h*)++ (?: (?|of|in|at|with|the|and|for) \h+)++ )++ $cap_word/ux;
 my $title = qr/(*FAIL)/ux;
-my $dateline = qr/(*FAIL)/ux;
+my $dateline = qr/(?| (?: $name , \h+)* $date | $date (?: , \h+ $name)+ ) /ux;
 
 my $dialog = qr/(*FAIL)/ux;
 
@@ -79,44 +102,43 @@ my $indent_par = qr/\h+ \V+  (?: \v (?!\h) \V+ | (?=\v(?:\v|\h|\Z)) )++/ux;
 my $catch_all = qr/\h* \V+/ux;
 
 
-my $paragraph_match = qr/( ^
-						  (?: (?: $block_list )
-						    | (?: $offset_block )
-						    | (?: $block_par )
-						    | (?: $indent_par )
-						    | (?: $catch_all )
-						  )
-						  (?: \v{2,} | \v (?=\h) | \Z)
-						)/mux;
-
-
 my %formats = (
-	#partial sentence
-	clause => qr/$flat_clause/,
+
+	#grouping of words delineated by whitespace
+	'10_flat_clause' => qr/$flat_clause/ux,
+
+	#several clauses separated by commas
+	'11_comma_clause' => qr/$comma_clause/ux,
 
 	#list of three or more items, delineated by [,;]
-	linear_list => qr/$linear_list/,
+	'20_semicolon_list' => qr/$semicolon_list/ux,
 
 	#one or more clauses, ending in   [:]   followed by a [linear_list]
-	sentence_list => qr/$sentence_list/,
+	'31_sentence_list' => qr/$sentence_list/ux,
 
-	#single alphanumeric chain followed by a delineating symbol    or    symbol followed by [\s]
-	block_list => qr/$block_list/,
+	#any complex clause that opens and closes with a bracket
+	'32_bracket_clause' => qr/$bracket_clause/ux,
 
 	#single complete sentence, must end in   [.?!]   or   ["”] followed by [\s][A-Z] or end of text
-	sentence => qr/^$sentence$/,
+	'40_sentence' => qr/$sentence/ux,
 
-	#one or more sentences, optionally ending in [:]
-	paragraph => qr/$paragraph/,
+	#one or more sentences
+	'50_paragraph' => qr/$paragraph/ux,
+
+	#single alphanumeric chain followed by a delineating symbol    or    symbol followed by [\s]
+	'60_block_list' => qr/$block_list/ux,
 
 	#sentence preceded by     one word or more words followed by a delineating symbol or [\s]
-	dialog => qr/$dialog/,
+	'70_dialog' => qr/$dialog/ux,
 
 	#fragment containing a date- or time-stamp
-	dateline => qr/$dateline/,
+	'80_dateline' => qr/$dateline/ux,
 
 	#fragment in all capitals or with trailing vertical whitespace
-	title => qr/$title/,
+	'81_title' => qr/$title/ux,
+
+	#sequence of capitalized words    or    [A-Z] followed by a [.]
+	'82_name' => qr/$name/ux,
 );
 
 
@@ -126,11 +148,21 @@ sub separate {
 	my $text  = shift;
 	my @paragraphs;
 
-	my $t0 = Benchmark->new;
+	my $paragraph_match = qr/( ^
+						  (?: (?: $block_list )
+						    | (?: $offset_block )
+						    | (?: $block_par )
+						    | (?: $indent_par )
+						    | (?: $catch_all )
+						  )
+						  (?: \v{2,} | \v (?=\h) | \Z)
+						)/mux;
+
+		#my $t0 = Benchmark->new;
 	push @paragraphs => $1 while $text =~ m/$paragraph_match/gmuxs; #splits *text* into an array of paragraphs
-	my $t1 = Benchmark->new;
-	my $td = timediff($t1, $t0);
-	say "Article took ",timestr($td);
+		#my $t1 = Benchmark->new;
+		#my $td = timediff($t1, $t0);
+		#say "Article took ",timestr($td);
 
 	return @paragraphs;
 }
@@ -145,20 +177,23 @@ sub typify {
 	PARAGRAPH: for my $chunk (@paragraphs) {
 		my @type;
 
-		TEST: for my $format (keys %formats) {
-			my $pattern = $formats{ $format };
+		TEST: for my $format (sort keys %formats) {
+			my $pattern = qr/$formats{ $format }/;
+			my @scraps;
 
-			if ( $chunk =~ qr/$pattern/muxs ) {
-				push @type => $format;
+			while ( $chunk =~ m/($pattern)/gmuxs ) {
+				push @scraps => $1;
 			}
+			push @type, $format => \@scraps if @scraps;
 		}
-		push @type => 'fragment' unless scalar @type;
+		push @type, 'fragment' => \$chunk unless @type;
 		push @category => \@type;
 	}
 
 	my @zipped = zip @paragraphs, @category;
 
-			$DB::single = 1;
+			use Data::Dumper;
+			print Dumper @zipped;
 
 	return @zipped;
 }
