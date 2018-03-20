@@ -2,10 +2,10 @@
 use lib 'lib';
 use Text::Summarizer;
 
-my $summarizer = Text::Summarizer->new( print_scanner => 1, print_summary => 1 );
+my $summarizer = Text::Summarizer->new( print_scanner => 0, print_summary => 0 );
 
 my $sample_text = <<'END_SAMPLE';
-	Avram Noam Chomsky, born December 7, 1928) is an American linguist, cognitive scientist, historian, social critic, and political activist. Sometimes described as "the father of modern linguistics," Chomsky is also one of the founders of the field of cognitive science. He is the author of over 100 books on topics such as linguistics, war, politics, and mass media. Ideologically, he aligns with anarcho-syndicalism and libertarian socialism. He holds a joint appointment as Institute Professor Emeritus at the Massachusetts Institute of Technology (MIT) and laureate professor at the University of Arizona.[22][23]
+	Avram Noam Chomsky (born December 7, 1928) is an American linguist, cognitive scientist, historian, social critic, and political activist. Sometimes described as "the father of modern linguistics," Chomsky is also one of the founders of the field of cognitive science. He is the author of over 100 books on topics such as linguistics, war, politics, and mass media. Ideologically, he aligns with anarcho-syndicalism and libertarian socialism. He holds a joint appointment as Institute Professor Emeritus at the Massachusetts Institute of Technology (MIT) and laureate professor at the University of Arizona.[22][23]
 
 	Born to middle-class Ashkenazi Jewish immigrants in Philadelphia, Chomsky developed an early interest in anarchism from alternative bookstores in New York City. At the age of 16 he began studies at the University of Pennsylvania, taking courses in linguistics, mathematics, and philosophy. From 1951 to 1955 he was appointed to Harvard University's Society of Fellows, where he developed the theory of transformational grammar for which he was awarded his doctorate in 1955. That year he began teaching at MIT, in 1957 emerging as a significant figure in the field of linguistics for his landmark work Syntactic Structures, which remodeled the scientific study of language, while from 1958 to 1959 he was a National Science Foundation fellow at the Institute for Advanced Study. He is credited as the creator or co-creator of the universal grammar theory, the generative grammar theory, the Chomsky hierarchy, and the minimalist program. Chomsky also played a pivotal role in the decline of behaviorism, being particularly critical of the work of B. F. Skinner.
 
