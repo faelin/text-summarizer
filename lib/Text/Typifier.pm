@@ -22,8 +22,10 @@ my $rt_brack = qr/\]\)\}\⟩\>/ux;  #] ) } ⟩ >
 my $month = qr/Jan(uary)? | Feb(ruary)? | Mar(ch)? | Apr(il)? | May | Jun(e)? | Jul(y)? | Aug(ust)? | Sep(tember)? | Oct(ober)? | Nov(ember)? | Dec(ember)?/ux;
 my $ordinal = qr/st | nd | rd | th/ux;
 
-my $word = qr/\w++ [-\w]*+/ux;
 my $cap_word = qr/[A-Z][A-Za-z]++/ux;
+my $name = qr/(?: (?: $cap_word \h | [A-Z]\. \h*)++ (?: (?|of|in|at|with|the|and|for) \h+)*+ )++ $cap_word/ux;
+my $abbr = qr/([A-Z]\.){2,}/ux;
+my $word = qr/$name|$abbr|['‘]?\w++ ['’\w-]*+/ux;
 my $date = qr/(?| $month \h+ \d{1,2} $ordinal? ,? \h+ \d\d(\d\d)? 
 				| \d{1,2} $ordinal? \h+ $month ,? \h+ \d\d(\d\d)? 
 
@@ -61,14 +63,13 @@ my $complex_clause = qr/$semicolon_list   |   $comma_clause  |  $flat_clause/ux;
 my $sentence_list = qr/$complex_clause   [:]\h+   $complex_clause/ux;
 	#matches any   [complex_clause]   followed by a [:]   followed by a [complex_clause]
 
-my $bracket_clause = qr/[$lt_brack] (?: $complex_clause | $sentence_list | (?R) )  [$rt_brack]/ux;
+my $bracket_clause = qr/([$lt_brack] (?: $complex_clause | $sentence_list | (?R) )  [$rt_brack])/ux;
 
 my $sentence = qr/(?| $sentence_list     |     (?: $complex_clause   (?: [$delineator,] \h* (?: $complex_clause|$sentence_list)?)++)  )      (?: $sen_term|  :(?=\v) )/ux;
     #matches either   a [sentence_list] followed by a sentence terminator   or   one or more delineated [complex_clause] followed by a sentence terminator
 
 my $paragraph = qr/$sentence (?: \s+ $sentence)++/ux;
     #one or more   [sentence]   delineated by whitespace
-my $name = qr/(?: (?: $cap_word \h | [A-Z]\. \h*)++ (?: (?|of|in|at|with|the|and|for) \h+)++ )++ $cap_word/ux;
 my $title = qr/(*FAIL)/ux;
 my $dateline = qr/(?| (?: $name , \h+)* $date | $date (?: , \h+ $name)+ ) /ux;
 
@@ -155,14 +156,13 @@ sub separate {
 						    | (?: $indent_par )
 						    | (?: $catch_all )
 						  )
-						  (?: \v{2,} | \v (?=\h) | \Z)
+						  (?: \v{2,} | \v (?=\h) | \Z)	
 						)/mux;
 
-		#my $t0 = Benchmark->new;
-	push @paragraphs => $1 while $text =~ m/$paragraph_match/gmuxs; #splits *text* into an array of paragraphs
-		#my $t1 = Benchmark->new;
-		#my $td = timediff($t1, $t0);
-		#say "Article took ",timestr($td);
+	while ($text =~ m/$paragraph_match/gmuxs) {
+		chomp( my $par = $1 );
+		push @paragraphs => $par;
+	}
 
 	return @paragraphs;
 }
@@ -184,16 +184,13 @@ sub typify {
 			while ( $chunk =~ m/($pattern)/gmuxs ) {
 				push @scraps => $1;
 			}
-			push @type, $format => \@scraps if @scraps;
+			push @type, ($format => \@scraps) if @scraps;
 		}
-		push @type, 'fragment' => \$chunk unless @type;
+		push @type, ('fragment' => \$chunk) unless @type;
 		push @category => \@type;
 	}
 
 	my @zipped = zip @paragraphs, @category;
-
-			use Data::Dumper;
-			print Dumper @zipped;
 
 	return @zipped;
 }
