@@ -5,12 +5,12 @@ use strict;
 use warnings;
 use Moo;
 use Types::Standard qw/ Bool Ref Str Int Num InstanceOf Bool /;
-use List::AllUtils qw/ max min sum sum0 singleton pairkeys /;
+use List::AllUtils qw/ max min sum sum0 singleton pairkeys pairs any /;
 use Algorithm::CurveFit;
 use Text::Typifier qw/ typify /;
 use utf8;
 
-binmode STDOUT, ':encoding(UTF-8)';
+binmode STDOUT, ':utf8';
 
 use vars qw(@ISA @EXPORT @EXPORT_OK %EXPORT_TAGS $VERSION);
 require Exporter;
@@ -53,6 +53,12 @@ has print_scanner => (
 );
 
 has print_summary => (
+	is => 'rw',
+	isa => Bool,
+	default => 0,
+);
+
+has print_typifier => (
 	is => 'rw',
 	isa => Bool,
 	default => 0,
@@ -109,6 +115,11 @@ has article_length => (
 has full_text => (
 	is => 'rwp',
 	isa => Str,
+);
+
+has types_list => (
+	is => 'rwp',
+	isa => Ref['ARRAY'],
 );
 
 has paragraphs => (
@@ -259,7 +270,7 @@ sub scan_text {
 sub scan_file {
 	my ($self, $file_path) = @_;
 
-	open( my $file, '<:encoding(UTF-8)', $file_path )
+	open( my $file, '<:utf8', $file_path )
 		or die "Can't open file $file_path for scanning: $!";
 
 	return $self->scan_text( $file, $file_path );
@@ -302,7 +313,7 @@ sub summarize_text {
 sub summarize_file {
 	my ($self, $file_path) = @_;
 
-	open( my $file, '<:encoding(UTF-8)', $file_path )
+	open( my $file, '<:utf8', $file_path )
 		or die "Can't open file $file_path for summarizing: $!";
 
 	return $self->summarize_text( $file, $file_path );
@@ -346,7 +357,36 @@ sub tokenize {
 	$self->_set_sentences( \@sentences );
 	$self->_set_word_list( \@word_list );
 	$self->_set_sen_words( \@sen_words );
-	$self->_set_paragraphs( \@paragraphs);
+	$self->_set_types_list( \@types_list );
+	$self->_set_paragraphs( \@paragraphs );
+
+
+	if ($self->print_typifier) {
+		say "\n\n———————————————————————————————————————————\n\n";
+
+
+		say "[file name] " . $self->file_name if $self->file_name;
+		say "[text hint] " . $self->text_hint;
+
+		say "\n---TEXT TYPE LIST---\n";
+
+		foreach ( pairs @types_list ) {
+   			my ( $paragraph, $category ) = @$_;
+
+   			say "PARAGRAPH:\n$paragraph\n";
+
+   			say "BREAKDOWN:";
+   			foreach ( pairs @$category ) {
+   				my ( $type, $scraps ) = @$_;
+
+   				my $format = "%s\n" . ("\t• %s\n"x@$scraps) . "\n";
+   				printf $format => ($type, @$scraps);
+   			}
+
+			say "\n";
+		}
+	}
+
 
 	return $self;
 }
@@ -705,7 +745,7 @@ sub analyze_phrases {
 					my $joined = join '|' => @{$bare_phrase{$test}};
 					$inter_hash{"($joined)"} = $inter_hash{$test} + $inter_hash{$scrap};
 					$inter_hash{$test} += $inter_hash{$scrap};
-					delete $inter_hash{$scrap} and next CLEAR;
+					#delete $inter_hash{$scrap} and next CLEAR;
 				}
 			}
 		}
