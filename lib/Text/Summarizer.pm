@@ -5,7 +5,7 @@ use strict;
 use warnings;
 use Moo;
 use Types::Standard qw/ Bool Ref Str Int Num InstanceOf Bool /;
-use List::AllUtils qw/ max min sum sum0 singleton pairkeys pairs any /;
+use List::AllUtils qw/ max min sum sum0 singleton pairkeys pairvalues pairs all /;
 use Algorithm::CurveFit;
 use Text::Typifier qw/ typify /;
 use utf8;
@@ -53,6 +53,12 @@ has print_scanner => (
 );
 
 has print_summary => (
+	is => 'rw',
+	isa => Bool,
+	default => 0,
+);
+
+has print_working => (
 	is => 'rw',
 	isa => Bool,
 	default => 0,
@@ -120,6 +126,29 @@ has full_text => (
 has types_list => (
 	is => 'rwp',
 	isa => Ref['ARRAY'],
+);
+
+has types_factor => (
+	is => 'rwp',
+	isa => Ref['HASH'],
+	default => sub {{	'10_flat_clause' => 1,
+						'11_comma_clause' => 1,
+						'20_semicolon_list' => 1,
+						'31_sentence_list' => 1,
+						'32_bracket_clause' => 1,
+						'40_sentence' => 1,
+						'50_paragraph' => 1,
+						'60_block_list' => 1,
+						'70_dialog' => 1,
+						'80_dateline' => 1,
+						'81_title' => 1,
+						'82_name' => 1,
+					}},
+);
+
+has types_scores => (
+	is => 'rwp',
+	isa => Ref['HASH'],
 );
 
 has paragraphs => (
@@ -336,6 +365,15 @@ sub tokenize {
 	my @types_list = typify($text);
 	my @paragraphs = pairkeys @types_list;
 
+
+	my %types_scores;
+	foreach my $category ( pairvalues @types_list ) {
+		foreach ( pairs @$category ) {
+			my ( $type, $scraps ) = @$_;
+			$types_scores{$_} += $self->types_factor->{$type} for map {   grep { !$self->stopwords->{$_} } split   } @$scraps;
+		}
+	}
+
 	my $sentence_match = qr/(?|   (?<=(?<!\s[A-Z][a-z]) (?<!\s[A-Z][a-z]{2}) \. (?![A-Z0-9]\.|\s[a-z0-9]) | \! | \?) (?:(?=[A-Z])|\s+) 
 							   |   (?: \n+ | ^\s+ | \s+$ )
 							)/mx;
@@ -357,35 +395,9 @@ sub tokenize {
 	$self->_set_sentences( \@sentences );
 	$self->_set_word_list( \@word_list );
 	$self->_set_sen_words( \@sen_words );
-	$self->_set_types_list( \@types_list );
 	$self->_set_paragraphs( \@paragraphs );
-
-
-	if ($self->print_typifier) {
-		say "\n\n———————————————————————————————————————————\n\n";
-
-
-		say "[file name] " . $self->file_name if $self->file_name;
-		say "[text hint] " . $self->text_hint;
-
-		say "\n---TEXT TYPE LIST---\n";
-
-		foreach ( pairs @types_list ) {
-   			my ( $paragraph, $category ) = @$_;
-
-   			say "PARAGRAPH:\n$paragraph\n";
-
-   			say "BREAKDOWN:";
-   			foreach ( pairs @$category ) {
-   				my ( $type, $scraps ) = @$_;
-
-   				my $format = "%s\n" . ("\t• %s\n"x@$scraps) . "\n";
-   				printf $format => ($type, @$scraps);
-   			}
-
-			say "\n";
-		}
-	}
+	$self->_set_types_list( \@types_list );
+	$self->_set_types_scores( \%types_scores);
 
 
 	return $self;
@@ -642,6 +654,8 @@ sub develop_stopwords {
 
 
 		if ($self->print_scanner) {
+			say "\nSCANNING:\n" . $self->full_text if $self->print_working;
+
 			say "\n\n———————————————————————————————————————————\n\n";
 
 
@@ -678,6 +692,7 @@ sub develop_stopwords {
 				my $score_string = sprintf " %5.2f |%s" => $score, ($score >= $lower and $score < $score_hash{$word_keys[$index - 1]} ? '-' x $score : '+' x $score);
 				printf $format => $word_keys[$index - 1], $score_string;
 			}
+			say "\n";
 		}
 	}	
 
@@ -732,19 +747,18 @@ sub analyze_phrases {
 
 	#combine scraps — if scrap "a" contains scrap "b", add the value of "b" to "a" and delete "b"
 	CLEAR: for my $scrap (sort { $inter_hash{$b} <=> $inter_hash{$a} or $a cmp $b } keys %inter_hash) {
-		my $compare = qr/\b$scrap\b/;
-		my $delete  = 0;
-		TEST: for my $test (keys %inter_hash) {
-			if ($test ne $scrap) {
-				if ($test =~ /$compare/) { #true iff  *scrap* ∈ *test*
-					$inter_hash{$test} += $inter_hash{$scrap};
+		TEST: for my $compare (keys %inter_hash) {
+			if ($compare ne $scrap) {
+				my %test_hash = map { ($_ => 1) } split " " => $compare;
+				if ( all { $test_hash{$_} } split " " => $scrap ) { #true iff  *scrap* ∈ *compare*
+					$inter_hash{$compare} += $inter_hash{$scrap};
 					delete $inter_hash{$scrap} and next CLEAR;
-				} elsif (not scalar singleton (@{$bare_phrase{$test}}, @{$bare_phrase{$scrap}}) ) { #true iff *bare_phrase{test}* == *bare_phrase{scrap}*
-					next TEST unless scalar @{$bare_phrase{$test}} > 1;
+				} elsif (not scalar singleton (@{$bare_phrase{$compare}}, @{$bare_phrase{$scrap}}) ) { #true iff *bare_phrase{compare}* == *bare_phrase{scrap}*
+					next TEST unless scalar @{$bare_phrase{$compare}} > 1;
 
-					my $joined = join '|' => @{$bare_phrase{$test}};
-					$inter_hash{"($joined)"} = $inter_hash{$test} + $inter_hash{$scrap};
-					$inter_hash{$test} += $inter_hash{$scrap};
+					my $joined = join '|' => @{$bare_phrase{$compare}};
+					$inter_hash{"($joined)"} = $inter_hash{$compare} + $inter_hash{$scrap};
+					$inter_hash{$compare} += $inter_hash{$scrap};
 					#delete $inter_hash{$scrap} and next CLEAR;
 				}
 			}
@@ -782,6 +796,34 @@ sub analyze_phrases {
 	$self->_set_summary( \%summary );
 
 
+	if ($self->print_working) {
+			say "\nSUMMARIZING:\n" . $self->full_text;
+	}
+
+	if ($self->print_typifier) {
+		say "\n\n———————————————————————————————————————————\n\n";
+		say "[file name] " . $self->file_name if $self->file_name;
+		say "[text hint] " . $self->text_hint;
+		say "\n---TEXT TYPE LIST---\n";
+
+		foreach ( pairs @{$self->types_list} ) {
+   			my ( $paragraph, $category ) = @$_;
+
+   			say "PARAGRAPH:\n$paragraph\n";
+
+   			say "BREAKDOWN:";
+   			foreach ( pairs @$category ) {
+   				my ( $type, $scraps ) = @$_;
+
+   				my $format = "%s\n" . ("\t• %s\n"x@$scraps) . "\n";
+   				printf $format => ($type, @$scraps);
+   			}
+
+			say "\n";
+		}
+	}
+
+
 	if ($self->print_summary) {
 		say "\n\n———————————————————————————————————————————\n\n";
 
@@ -793,32 +835,49 @@ sub analyze_phrases {
 
 		my ($sentences, $fragments, $words) = @{$self->summary}{'sentences','fragments','words'};
 
-		say "SUMMARY:";
-		my @sentence_keys = sort { $sentences->{$b} <=> $sentences->{$a} or $a cmp $b} keys %$sentences;
-		for my $sen ( @sentence_keys[0..min($self->return_count,$#sentence_keys)] ) {
-			printf "%4d => %s\n" => $sentences->{$sen}, $sen;
+		SUMMARY: {
+			say "SUMMARY:";
+			my @sentence_keys = sort { $sentences->{$b} <=> $sentences->{$a} or $a cmp $b} keys %$sentences;
+			for my $sen ( @sentence_keys[0..min($self->return_count,$#sentence_keys)] ) {
+				printf "%4d => %s\n" => $sentences->{$sen}, $sen;
+			}
+			say "\n";
 		}
-		say "\n";
 
-
-		say "PHRASES:";
-		my @phrase_keys = sort { $fragments->{$b} <=> $fragments->{$a} or $a cmp $b } keys %$fragments;
-		for my $phrase ( @phrase_keys[0..min($self->return_count,$#phrase_keys)] ) {
-			printf "%8d => %s\n" => $fragments->{$phrase}, $phrase;
-		} 
-		say "\n";
-
-
-		say "  WORDS:";
-		my @word_keys = sort { $words->{$b} <=> $words->{$a} or $a cmp $b } keys %$words;
-		my $highest = $words->{$word_keys[0]};
-		my $longest = max map {length} @word_keys;
-		KEY: for my $word ( @word_keys[0..min($self->return_count,$#word_keys)] ) {
-			my $format = "%" . $longest . "s|%s\n";
-			my $score = int(40*$words->{$word}/$highest);
-			printf $format => ( $word , "-" x $score ) if $score > 2;
+		PHRASES: {
+			say "PHRASES:";
+			my @phrase_keys = sort { $fragments->{$b} <=> $fragments->{$a} or $a cmp $b } keys %$fragments;
+			for my $phrase ( @phrase_keys[0..min($self->return_count,$#phrase_keys)] ) {
+				printf "%8d => %s\n" => $fragments->{$phrase}, $phrase;
+			} 
+			say "\n";
 		}
-		say "\n";
+
+		WORDS: {
+			say "  WORDS:";
+			my @word_keys = sort { $words->{$b} <=> $words->{$a} or $a cmp $b } keys %$words;
+			my $highest = $words->{$word_keys[0]};
+			my $longest = max map {length} @word_keys;
+			KEY: for my $word ( @word_keys[0..min($self->return_count,$#word_keys)] ) {
+				my $format = "%" . $longest . "s|%s\n";
+				my $score = int(40*$words->{$word}/$highest);
+				printf $format => ( $word , "-" x $score ) if $score > 2;
+			}
+			say "\n";
+		}
+
+		TYPES: {
+			say "  TYPES:";
+				my @type_keys = sort { $self->types_scores->{$b} <=> $self->types_scores->{$a} or $a cmp $b } keys %{$self->types_scores};
+				my $highest = $self->types_scores->{$type_keys[0]};
+				my $longest = max map {length} @type_keys;
+				KEY: for my $word ( @type_keys[0..min($self->return_count,$#type_keys)] ) {
+					my $format = "%" . $longest . "s| %" . (length $highest) . "s |%s\n";
+					my $score = int(40*$self->types_scores->{$word}/$highest);
+					printf $format => ( $word, $score, "-" x $score ) if $score > 2;
+				}
+				say "\n";
+		}
 	}
 
 
