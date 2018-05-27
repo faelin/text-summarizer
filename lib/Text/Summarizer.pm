@@ -143,6 +143,12 @@ has types_factor => (
 						'80_dateline' => 1,
 						'81_title' => 1,
 						'82_name' => 1,
+						'90_bold' => 1,
+						'91_italic' => 1,
+						'92_strong' => 1,
+						'93_table' => 1,
+						'94_faq_div' => 1,
+						'95_title' => 1,
 					}},
 );
 
@@ -370,10 +376,13 @@ sub tokenize {
 	foreach my $category ( pairvalues @types_list ) {
 		foreach ( pairs @$category ) {
 			my ( $type, $scraps ) = @$_;
-			$types_scores{$_} += $self->types_factor->{$type} for map {   grep { !$self->stopwords->{$_} } split   } @$scraps;
+			$types_scores{lc $_} += $self->types_factor->{$type} for 
+				map {   grep { !$self->stopwords->{lc $_} and /[A-Za-z]/ } /\b[\w-]+\b/gx  }
+					(ref $scraps eq 'ARRAY' ? @$scraps : $$scraps );
 		}
 	}
 
+	$text = join "\n" => pairkeys @types_list;
 	my $sentence_match = qr/(?|   (?<=(?<!\s[A-Z][a-z]) (?<!\s[A-Z][a-z]{2}) \. (?![A-Z0-9]\.|\s[a-z0-9]) | \! | \?) (?:(?=[A-Z])|\s+) 
 							   |   (?: \n+ | ^\s+ | \s+$ )
 							)/mx;
@@ -383,7 +392,7 @@ sub tokenize {
 	my @word_list;  # array literal of all the words in the entire text body
 	my @sen_words; # array reference to all of the tokens in each sentence
 	for (@sentences) {  #creates an array of each word in the current article
-		my @words = map { /\b (?: \w \. (?: ['’-] \w+ )?)+ | (?: \w+ ['’-]? )+ (?=\s|\b)/gx } lc $_;  #tokenizes each sentence into complete words (single-quotes are considered part of the word they attach to)
+		my @words = grep { /[A-Za-z]/ } map { /\b (?: \w \. (?: ['’-] \w+ )?)+ | (?: \w+ ['’-]? )+ (?=\s|\b)/gx } lc $_;  #tokenizes each sentence into complete words (single-quotes are considered part of the word they attach to)
 		push @word_list =>  @words;
 		push @sen_words => \@words;
 	}
@@ -411,7 +420,7 @@ sub _build_freq_hash {
 	my $min_freq_thresh = int($self->article_length * $self->freq_constant) // 1; #estimates a minimum threshold of occurence for frequently occuring words
 	my %freq_hash; #counts the number of times each word appears in the *%word_list* hash
 	for my $word (@{$self->word_list}) {
-	 	$freq_hash{$word}++ unless $self->stopwords->{$word};
+	 	$freq_hash{$word}++ unless $self->stopwords->{$word} or $word !~ /[A-Za-z]/;
 	}
 	grep { delete $freq_hash{$_} if $freq_hash{$_} < $min_freq_thresh } keys %freq_hash;
 		#remove words that appear less than the *$min_freq_thresh*
@@ -838,8 +847,10 @@ sub analyze_phrases {
 		SUMMARY: {
 			say "SUMMARY:";
 			my @sentence_keys = sort { $sentences->{$b} <=> $sentences->{$a} or $a cmp $b} keys %$sentences;
+			my $highest = $sentences->{$sentence_keys[0]};
 			for my $sen ( @sentence_keys[0..min($self->return_count,$#sentence_keys)] ) {
-				printf "%4d => %s\n" => $sentences->{$sen}, $sen;
+				my $score = 100*log($sentences->{$sen})/log($highest);
+				printf "%d => %s\n" => $score, $sen;
 			}
 			say "\n";
 		}
@@ -847,8 +858,10 @@ sub analyze_phrases {
 		PHRASES: {
 			say "PHRASES:";
 			my @phrase_keys = sort { $fragments->{$b} <=> $fragments->{$a} or $a cmp $b } keys %$fragments;
+			my $highest = $fragments->{$phrase_keys[0]};
 			for my $phrase ( @phrase_keys[0..min($self->return_count,$#phrase_keys)] ) {
-				printf "%8d => %s\n" => $fragments->{$phrase}, $phrase;
+				my $score = 100*log($fragments->{$phrase})/log($highest);
+				printf "%d => %s\n" => $score, $phrase;
 			} 
 			say "\n";
 		}
@@ -859,9 +872,9 @@ sub analyze_phrases {
 			my $highest = $words->{$word_keys[0]};
 			my $longest = max map {length} @word_keys;
 			KEY: for my $word ( @word_keys[0..min($self->return_count,$#word_keys)] ) {
-				my $format = "%" . $longest . "s|%s\n";
+				my $format = "%" . $longest . "s| %2s |%s\n";
 				my $score = int(40*$words->{$word}/$highest);
-				printf $format => ( $word , "-" x $score ) if $score > 2;
+				printf $format => ( $word, $score, "-" x $score ) if $score > 2;
 			}
 			say "\n";
 		}
@@ -872,7 +885,7 @@ sub analyze_phrases {
 				my $highest = $self->types_scores->{$type_keys[0]};
 				my $longest = max map {length} @type_keys;
 				KEY: for my $word ( @type_keys[0..min($self->return_count,$#type_keys)] ) {
-					my $format = "%" . $longest . "s| %" . (length $highest) . "s |%s\n";
+					my $format = "%" . $longest . "s| %2s |%s\n";
 					my $score = int(40*$self->types_scores->{$word}/$highest);
 					printf $format => ( $word, $score, "-" x $score ) if $score > 2;
 				}
