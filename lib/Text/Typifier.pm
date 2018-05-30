@@ -20,15 +20,13 @@ $VERSION = '1.0';
 
 
 my $delineator = qr/\u002D\u2010-\u2015\u2212\uFE63\uFF0D.;:/ux;  #- ‐ ‒ – — ― ﹣ － . ; :
-my $lt_brack = qr/\[\(\{\⟨\</ux;  #[ ( { ⟨ <
-my $rt_brack = qr/\]\)\}\⟩\>/ux;  #] ) } ⟩ >
 my $month = qr/Jan(uary)? | Feb(ruary)? | Mar(ch)? | Apr(il)? | May | Jun(e)? | Jul(y)? | Aug(ust)? | Sep(tember)? | Oct(ober)? | Nov(ember)? | Dec(ember)?/ux;
 my $ordinal = qr/st | nd | rd | th/ux;
 
 my $cap_word = qr/[A-Z][A-Za-z]++/ux;
 my $name = qr/(?: (?: $cap_word \h | [A-Z]\. \h*)++ (?: (?|of|in|at|with|the|and|for) \h+)*+ )++ $cap_word/ux;
 my $abbr = qr/([A-Z]\.){2,}/ux;
-my $word = qr/$name|$abbr|['‘]?\w++ ['’\w-]*+/ux;
+my $word = qr/(?'quote'[“"]) $name|$abbr|['‘]?\w (?: ['’\w-]* \w)? ['’]? (?('quote')["”]|)/ux;
 my $date = qr/(?(DEFINE)(?'month'$month))(?(DEFINE)(?'ordinal'$ordinal))
 			  (?| (?P>month) \h+ \d{1,2} (?P>ordinal)? ,? \h+ \d\d(\d\d)? 
 				| \d{1,2} (?P>ordinal)? \h+ (?P>month) ,? \h+ \d\d(\d\d)? 
@@ -48,36 +46,40 @@ my $date = qr/(?(DEFINE)(?'month'$month))(?(DEFINE)(?'ordinal'$ordinal))
 				| \d\d\d\d \. \d\d \. \d\d
 			  )/ux;
 
-my $sen_init = qr/(?= [$lt_brack]? ["“]? (?: $cap_word|[0-9]++) )/ux;
+my $sen_init = qr/(?= [ \[\(\{\⟨ ]? ["“]? (?: $cap_word|[0-9]++) )/ux;
 	#SENTENCE INITIATOR: detects beginning of a sentence (zero-width assertion)
 my $sen_term = qr/(?(DEFINE)(?'sen_init'$sen_init))
-				  [\.?!‽…⋯᠁]+  (?(?=["”]) (?: ["”](?= \h+ (?P>sen_init) )|(?:["”]\v))    |    [$rt_brack]?  (?= (?:\s+ (?P>sen_init) )|\v|[^\w\d]) )/ux;
+				  [\.?!‽…⋯᠁]+  (?(?=["”]) (?: ["”](?= \h+ (?P>sen_init) )|(?:["”]\v))    |    [ \]\)\}\⟩ ]?  (?= (?:\s+ (?P>sen_init) )|\v|[^\w\d]) )/ux;
 	#SENTENCE TERMINATOR: matches any number of   [.?!] with optional final ["”]   followed by a new sentence or [\v] or the end of the block
 
 my $flat_clause = qr/(?(DEFINE)(?'word'$word))
-					 (?P>word)++ (?: \h+ (?P>word))*+/ux;
+					 (?'left' (?<= <) \/?)?  (?'text' (?P>word) (?: \h+ (?P>word))*+)  (*SKIP)  (?('left')(?! >))/ux;
 	#matches a grouping of words that
 
 my $comma_clause = qr/(?(DEFINE)(?'flat_clause'$flat_clause))
 					  (?P>flat_clause) ([,] \h+ (?P>flat_clause))++/ux;
 
+my $quote_clause = qr/(?(DEFINE)(?'joint_clause'$comma_clause|$flat_clause))
+					  (?P>joint_clause)?+ [“"] (?P>joint_clause) ["”] (?P>joint_clause)?+ /ux;
+
 my $semicolon_list = qr/(?(DEFINE)(?'comma_clause'$comma_clause))
-						(?: (?P>comma_clause);["”]?\h+)++ (?P>comma_clause)/ux;
+						(?: (?P>comma_clause);\h+)++ (?P>comma_clause)/ux;
 	#matches several clauses in a row, delineated by   [;]   or   [,]    (n.b. clauses separated by [;] may have [,] interally)
 
-my $complex_clause = qr/$semicolon_list   |   $comma_clause  |  $flat_clause/ux;
+my $complex_clause = qr/ $semicolon_list  |  $quote_clause  |  $comma_clause  |  $flat_clause /ux;
 	#matches either a   [semicolon_list]   or   [flat_clause]
 
 my $sentence_list = qr/(?(DEFINE)(?'complex_clause'$complex_clause))
 					   (?P>complex_clause)   [:]\h+   (?P>complex_clause)/ux;
 	#matches any   [complex_clause]   followed by a [:]   followed by a [complex_clause]
 
-my $bracket_clause = qr/([$lt_brack] (?: $complex_clause | $sentence_list | (?R) )  [$rt_brack])/ux;
+my $bracket_clause = qr/[ \[\(\{\⟨ ] (?| (?:$sentence_list \h*)  |  (?:$complex_clause) \h*  )++  [ \]\)\}\⟩ ]/ux;
 
 my $sentence = qr/(?(DEFINE)(?'complex_clause')$complex_clause)
 				  (?| $sentence_list
-                    | (?: (?P>complex_clause)   (?: [$delineator,] \h* (?: (?P>complex_clause)|$sentence_list)?)++)  
-                  )
+                    | (?: (?P>complex_clause)   (?: [\u002D\u2010-\u2015\u2212\uFE63\uFF0D.;:,] \h* (?: (?P>complex_clause)|$sentence_list)?)++)
+                  )+
+                  (?: \h+ $bracket_clause)
                   (?: $sen_term|  :(?=\v) )/ux;
     #matches either   a [sentence_list] followed by a sentence terminator   or   one or more delineated [complex_clause] followed by a sentence terminator
 
@@ -90,20 +92,32 @@ my $dialog = qr/(*FAIL)/ux;
 
 my $html_bold = qr/<(?'tag' b)>  (?'text' .*?(?:((?R)).*?)?)  <\/\g{tag}>/ux;
 my $html_italic = qr/<(?'tag' i)>  (?'text' .*?(?:((?R)).*?)?)  <\/\g{tag}>/ux;
+my $html_under = qr/<(?'tag' u)>  (?'text' .*?(?:((?R)).*?)?)  <\/\g{tag}>/ux;
 my $html_strong = qr/<(?'tag' strong)>  (?'text' .*?(?:((?R)).*?)?)  <\/\g{tag}>/ux;
-my $html_table = qr/<(?'tag' table)>  (?'text' .*?(?:((?R)).*?)?)  <\/\g{tag}>/ux;
-my $html_faq_div = qr/<(?'tag' faq-\w+)>  (.*?(?:((?R)).*?)?)  <\/\g{tag}>/ux;
 my $html_title = qr/<(?'tag' title)>  (?'text' .*?(?:((?R)).*?)?)  <\/\g{tag}>/ux;
+my $html_table = qr/<(?'tag' table)>  (?'text' .*?(?:((?R)).*?)?)  <\/\g{tag}>/sux;
+my $html_ulist = qr/<(?'tag' ul)>  (?'text' .*?(?:((?R)).*?)?)  <\/\g{tag}>/sux;
+my $html_olist = qr/<(?'tag' ol)>  (?'text' .*?(?:((?R)).*?)?)  <\/\g{tag}>/sux;
+my $html_dlist = qr/<(?'tag' dl)>  (?'text' .*?(?:((?R)).*?)?)  <\/\g{tag}>/sux;
+my $html_faq_div = qr/<(?'tag' faq-\w+)>  (.*?(?:((?R)).*?)?)  <\/\g{tag}>/ux;
+my $html_head1 = qr/<(?'tag' h1)>  (.*?(?:((?R)).*?)?)  <\/\g{tag}>/ux;
+my $html_head2 = qr/<(?'tag' h2)>  (.*?(?:((?R)).*?)?)  <\/\g{tag}>/ux;
+my $html_head3 = qr/<(?'tag' h3)>  (.*?(?:((?R)).*?)?)  <\/\g{tag}>/ux;
+my $html_head4 = qr/<(?'tag' h4)>  (.*?(?:((?R)).*?)?)  <\/\g{tag}>/ux;
+my $html_head5 = qr/<(?'tag' h5)>  (.*?(?:((?R)).*?)?)  <\/\g{tag}>/ux;
+my $html_head6 = qr/<(?'tag' h6)>  (.*?(?:((?R)).*?)?)  <\/\g{tag}>/ux;
 
 #THE FOLLOWING ARE PARAGRAPH-MATCHING BLOCKS FOR USE WHEN SEPARATING ADJACENT PARAGRAPHS WITHIN A TEXT
 my $html_block = qr/(<(?'tag'[\w-]+)(?:\h[^>]*)?>(.*?(?:(?'inner'(?R)).*?)?)<\/\g{tag}>)/ux;
-my $block_list = qr/(?P<list>
+my $block_list = qr/(?(DEFINE)(?'delineator'[\u002D\u2010-\u2015\u2212\uFE63\uFF0D.;:]))
+					(?: <(?'tag' table)>)?+
+					(?P<list>
 						^ (?P<indent>\h+)*+ 
 
 						(?P<item>
-							(?P<open>    [$lt_brack] (?P<space> \h+ )?   )?
-							(?:    (?P<char>   (?P<alpha> [A-Za-z]++)  |  (?P<numer> \d++))  ([$delineator,]?\w+)*+    |    (?P<bullet> [^$lt_brack\w\s]++)  )
-							(?P<close>     (?(<open>)    (?(<space>) \h+ | )  [$rt_brack]    |    (?(<char>)  (?:[$rt_brack]  |  \h*[$delineator,] )  |  )    ))
+							(?P<open>	[ \[\(\{\⟨ ] (?P<space> \h+ )?   )?
+							(?:			(?P<char>   (?P<alpha> [A-Za-z]++)  |  (?P<numer> \d++))  ((?P>delineator)?\w+)*+    |    (?P<bullet> [^ \[\(\{\⟨ \w\s]++)  )
+							(?P<close>	(?(<open>)    (?(<space>) \h+ | )  [ \]\)\}\⟩ ]    |    (?(<char>)  (?:[ \]\)\}\⟩ ]  |  \h*(?P>delineator) )  |  )    ))
 							\h* .+
 						)
 
@@ -111,12 +125,13 @@ my $block_list = qr/(?P<list>
 							\n{1,2} ^
 							(?(?!\s+)
 								(?(<open>) (?P=open) | )
-								(?(<char>)   (?(<alpha>) [A-Za-z]+ | \d+ )([$delineator,]?\w+)*    |    (?: (?P=bullet)|(*FAIL) ))
+								(?(<char>)   (?(<alpha>) [A-Za-z]+ | \d+ )((?P>delineator)?\w+)*    |    (?: (?P=bullet)|(*FAIL) ))
 								(?P=close)
 							)
 							\h* .+
 						)*
-					)/ux;
+					)
+					(?! \v* <\/\g{tag}>)/ux;
 my $offset_block = qr/\h+ \V+  (?: \v ^ \h+ \w++ \V+)++/ux;
 my $block_par = qr/(?: (?!\h) \V+ (?: \v (?!\h) \V+)*+ )/ux;
 my $indent_par = qr/\h+ \V+  (?: \v (?!\h) \V+ | (?=\v(?:\v|\h|\Z)) )++/ux;
@@ -140,14 +155,8 @@ my %formats = (
 	#any complex clause that opens and closes with a bracket
 	'32_bracket_clause' => qr/$bracket_clause/ux,
 
-	#single complete sentence, must end in   [.?!]   or   ["”] followed by [\s][A-Z] or end of text
-	'40_sentence' => qr/$sentence/ux,
-
-	#one or more sentences
-	'50_paragraph' => qr/$paragraph/ux,
-
-	#single alphanumeric chain followed by a delineating symbol    or    symbol followed by [\s]
-	'60_block_list' => qr/$block_list/ux,
+	#complex clause contained in double-quotes
+	'33_quote_clause' => qr/$quote_clause/ux,
 
 	#sentence preceded by     one word or more words followed by a delineating symbol or [\s]
 	'70_dialog' => qr/$dialog/ux,
@@ -168,15 +177,45 @@ my %formats = (
 	'91_italic' => qr/$html_italic/ux,
 
 	#matches text tagged with <strong></strong>
-	'92_strong' => qr/$html_strong/ux,
+	'92_under' => qr/$html_under/ux,
+
+	#matches text tagged with <strong></strong>
+	'93_strong' => qr/$html_strong/ux,
+
+	'94_title' => qr/$html_title/ux,
 
 	#matches text tagged with <table></table>
-	'93_table' => qr/$html_table/ux,
+	'95_table' => qr/$html_table/ux,
+
+	'96_ulist' => qr/$html_ulist/ux,
+
+	'97_olist' => qr/$html_olist/ux,
+	
+	'98_dlist' => qr/$html_dlist/ux,
 
 	#matches text tagged with <faq-[...]></faq-[...]>
-	'94_faq_div' => qr/$html_faq_div/ux,
+	'99_faq_div' => qr/$html_faq_div/ux,
 
-	'95_title' => qr/$html_title/ux,
+	'100_h1' => qr/$html_head1/ux,
+
+	'101_h2' => qr/$html_head2/ux,
+
+	'102_h3' => qr/$html_head3/ux,
+
+	'103_h4' => qr/$html_head4/ux,
+
+	'104_h5' => qr/$html_head5/ux,
+
+	'105_h6' => qr/$html_head6/ux,
+
+	#single complete sentence, must end in   [.?!]   or   ["”] followed by [\s][A-Z] or end of text
+	'200_sentence' => qr/$sentence/ux,
+
+	#one or more sentences
+	'210_paragraph' => qr/$paragraph/ux,
+
+	#single alphanumeric chain followed by a delineating symbol    or    symbol followed by [\s]
+	'220_block_list' => qr/$block_list/ux,
 );
 
 
@@ -224,8 +263,7 @@ sub extract {
 		my $tag = ($node->can('tag') ? $node->tag() // '' : '');
 
 		if ( !$node->can('descendants') ) {
-			my $text = $node->can('as_XML') ? $node->as_XML : $node;	
-			push @paragraphs => $text unless $text =~ /^\s*$/;
+			push @paragraphs => $node;
 
 		} elsif ( $tag eq 'table' ) {
 			my @header = $node->find('thead');
@@ -233,15 +271,15 @@ sub extract {
 			my @footer = $node->find('tfoot');
 			my $concat = '';
 			for ( @header ) {
-				$concat .= (join " " => map { $_->as_text } $node->find('th')) . "\n" for $node->find('tr');
+				$concat .= (join " " => map { extract($_) } map { $_->detach_content } $node->find('th')->detach_content) . "\n" for $node->find('tr');
 			}
 			for ( pairwise { $b ? ($a, $b) : ($a) } @body, @footer ) {
-				$concat .= (join " " => map { $_->as_text } $_->find('td')) . "\n" for $node->find('tr');
+				$concat .= (join " " => grep { /./ } map { $_ =~ s/\v|^\s+$//r } map { extract($_) } map { $_->detach_content } $_->find('td')) . "\n" for $node->find('tr');
 			}
 			push @paragraphs => "<$tag>$concat</$tag>";
 
 		} elsif ( $tag eq 'ul' or $tag eq 'ol' ) {
-			my $table_string = "<$tag>" . (join "\n" => map { $_->as_text } $node->find('li')) . "</$tag>";
+			my $table_string = "<$tag>" . (join "\n" => map { extract($_) } map { $_->detach_content } $node->find('li')) . "</$tag>";
 			push @paragraphs => $table_string;
 
 		} elsif ( $tag eq 'dl' ) {
@@ -264,14 +302,11 @@ sub extract {
 			$concat = "<$class>$concat</$class>";
 			push @paragraphs => $concat;
 
-		} elsif ( $node->find('code') ) {
-			push @paragraphs => '<code>' . ( join " " => extract($node->content_list) ) . '</code>';
-
 		} elsif ( $tag eq 'a' ) {
 			my $parent = $node->parent;
 			next NODE unless $parent;
 			$node->replace_with_content;
-			my @content = extract($parent);
+			my @content = extract($node);
 			push @paragraphs => @content;
 
 		} elsif (	$tag eq 'b' or 
@@ -282,18 +317,20 @@ sub extract {
 					$tag =~ /h\d/
 				) {
 			my @content = extract($node->content_list);
-			$node->destroy_content if @	content;
-			$node->push_content(@content);
+			if (@content) {
+				$node->destroy_content;
+				$node->push_content(@content);
+			}
 			push @paragraphs => $node->as_XML;
 
 		} elsif ( $tag eq 'code' ) {
-			push @paragraphs => $node->as_text;
+			push @paragraphs => $node->as_XML;
 
 		} elsif ( $tag eq 'br' ) {
-			$node->destroy;
+			push @paragraphs => "\n";
 
 		} else {
-			push @paragraphs => extract($node->content_list);
+			push @paragraphs => ( join "" => extract($node->content_list) );
 		}
 	}
 
@@ -319,12 +356,14 @@ sub typify {
 	PARAGRAPH: for my $chunk (@paragraphs) {
 		my @type;
 
+		decode_entities($chunk);
+
 		TEST: for my $format (sort keys %formats) {
 			my $pattern = qr/$formats{ $format }/;
 			my @scraps;
 
 			while ( $chunk =~ m/($pattern)/gmuxs ) {
-				push @scraps => $+{text_hint} // $1;
+				push @scraps => $+{text} // $1;
 			}
 			push @type, ($format => \@scraps) if @scraps;
 		}
