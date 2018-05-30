@@ -2,8 +2,8 @@ package Text::Typifier;
 
 use v5.14;
 use List::AllUtils qw/ zip pairs pairwise /;
-#use HTML::TreeBuilder 5 -weak;
-use HTML::TreeBuilder::XPath;
+use HTML::TreeBuilder 5 -weak;
+use HTML::Entities qw/ decode_entities /;
 use Text::Markup;
 use strict;
 use warnings;
