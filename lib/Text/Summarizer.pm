@@ -136,19 +136,30 @@ has types_factor => (
 						'20_semicolon_list' => 1,
 						'31_sentence_list' => 1,
 						'32_bracket_clause' => 1,
-						'40_sentence' => 1,
-						'50_paragraph' => 1,
-						'60_block_list' => 1,
+						'33_quote_clause' => 1,
 						'70_dialog' => 1,
 						'80_dateline' => 1,
 						'81_title' => 1,
 						'82_name' => 1,
 						'90_bold' => 1,
 						'91_italic' => 1,
-						'92_strong' => 1,
-						'93_table' => 1,
-						'94_faq_div' => 1,
-						'95_title' => 1,
+						'92_under' => 1,
+						'93_strong' => 1,
+						'94_title' => 1,
+						'95_table' => 1,
+						'96_ulist' => 1,
+						'97_olist' => 1,
+						'98_dlist' => 1,
+						'99_faq_div' => 1,
+						'100_h1' => 1,
+						'101_h2' => 1,
+						'102_h3' => 1,
+						'103_h4' => 1,
+						'104_h5' => 1,
+						'105_h6' => 1,
+						'200_sentence' => 1,
+						'210_paragraph' => 1,
+						'220_block_list' => 1,
 					}},
 );
 
@@ -373,16 +384,20 @@ sub tokenize {
 
 
 	my %types_scores;
+
+
 	foreach my $category ( pairvalues @types_list ) {
 		foreach ( pairs @$category ) {
 			my ( $type, $scraps ) = @$_;
-			$types_scores{lc $_} += $self->types_factor->{$type} for 
+			$types_scores{lc $_} += ($self->types_factor->{$type} // 1) for 
 				map {   grep { !$self->stopwords->{lc $_} and /[A-Za-z]/ } /\b[\w-]+\b/gx  }
 					(ref $scraps eq 'ARRAY' ? @$scraps : $$scraps );
 		}
 	}
 
 	$text = join "\n" => pairkeys @types_list;
+
+
 	my $sentence_match = qr/(?|   (?<=(?<!\s[A-Z][a-z]) (?<!\s[A-Z][a-z]{2}) \. (?![A-Z0-9]\.|\s[a-z0-9]) | \! | \?) (?:(?=[A-Z])|\s+) 
 							   |   (?: \n+ | ^\s+ | \s+$ )
 							)/mx;
@@ -796,11 +811,28 @@ sub analyze_phrases {
 		$sort_list{$_} += $self->score_hash->{$_} // 0;
 	}
 
+
 	my %sentences = map { ($_ => $self->phrs_list->{$_}) } sort { $self->phrs_list->{$b} <=> $self->phrs_list->{$a} } keys %{$self->phrs_list};
 	my %fragments = map { ($_ => $self->inter_hash->{$_})  } sort { $self->inter_hash->{$b} <=> $self->inter_hash->{$a} or $a cmp $b } keys %{$self->inter_hash};
 	my %singleton = map { ($_ => $sort_list{$_}) 		   } sort { $sort_list{$b} <=> $sort_list{$a} or $a cmp $b } keys %sort_list;
 
-	my %summary = ( sentences => \%sentences, fragments => \%fragments, words => \%singleton );
+
+
+	my @type_keys = sort { $self->types_scores->{$b} <=> $self->types_scores->{$a} or $a cmp $b } keys %{$self->types_scores};
+	my $highest = $self->types_scores->{$type_keys[0]};
+	my %merge_list;
+	for (@type_keys) {
+		$merge_list{$_} = int(40*$self->types_scores->{$_}/$highest);
+	}
+	my @word_keys = sort { $singleton{$b} <=> $singleton{$a} or $a cmp $b } keys %singleton;
+	$highest = $singleton{$word_keys[0]};
+	for (@word_keys) {
+		$merge_list{$_} = ($merge_list{$_} // 0) + int(40*$singleton{$_}/$highest);
+	}
+
+
+
+	my %summary = ( sentences => \%sentences, fragments => \%fragments, words => \%singleton, typed => \%{$self->types_scores}, merged => \%merge_list );
 
 	$self->_set_summary( \%summary );
 
@@ -824,8 +856,10 @@ sub analyze_phrases {
    			foreach ( pairs @$category ) {
    				my ( $type, $scraps ) = @$_;
 
-   				my $format = "%s\n" . ("\t• %s\n"x@$scraps) . "\n";
-   				printf $format => ($type, @$scraps);
+   				if (ref $scraps eq 'ARRAY') {
+	   				my $format = "%s\n" . ("\t• %s\n"x@$scraps) . "\n";
+	   				printf $format => ($type, @$scraps);
+	   			}
    			}
 
 			say "\n";
@@ -881,16 +915,29 @@ sub analyze_phrases {
 
 		TYPES: {
 			say "  TYPES:";
-				my @type_keys = sort { $self->types_scores->{$b} <=> $self->types_scores->{$a} or $a cmp $b } keys %{$self->types_scores};
-				my $highest = $self->types_scores->{$type_keys[0]};
-				my $longest = max map {length} @type_keys;
-				KEY: for my $word ( @type_keys[0..min($self->return_count,$#type_keys)] ) {
-					my $format = "%" . $longest . "s| %2s |%s\n";
-					my $score = int(40*$self->types_scores->{$word}/$highest);
-					printf $format => ( $word, $score, "-" x $score ) if $score > 2;
-				}
-				say "\n";
+			my @type_keys = sort { $self->types_scores->{$b} <=> $self->types_scores->{$a} or $a cmp $b } keys %{$self->types_scores};
+			my $highest = $self->types_scores->{$type_keys[0]};
+			my $longest = max map {length} @type_keys;
+			KEY: for my $word ( @type_keys[0..min($self->return_count,$#type_keys)] ) {
+				my $format = "%" . $longest . "s| %2s |%s\n";
+				my $score = int(40*$self->types_scores->{$word}/$highest);
+				printf $format => ( $word, $score, "-" x $score ) if $score > 2;
+			}
+			say "\n";
 		}
+
+		MERGED: {
+			say "  MERGED:";
+			my @merge_keys = sort { $merge_list{$b} <=> $merge_list{$a} or $a cmp $b } keys %merge_list;
+			my $highest = $merge_list{$merge_keys[0]};
+			my $longest = max map {length} @merge_keys;
+			KEY: for my $word ( @merge_keys[0..min($self->return_count,$#merge_keys)] ) {
+				my $format = "%" . $longest . "s| %2s |%s\n";
+				my $score = int(40*$merge_list{$word}/$highest);
+				printf $format => ( $word, $score, "-" x $score ) if $score > 2;
+		}
+		say "\n";
+}
 	}
 
 
