@@ -3,7 +3,7 @@ use lib 'lib';
 use Text::Summarizer;
 use utf8;
 
-my $summarizer = Text::Summarizer->new( print_working => 0, print_scanner => 0, print_summary => 1, print_typifier => 0 );
+my $summarizer = Text::Summarizer->new( print_working => 0, print_scanner => 0, print_summary => 0, print_graphs => 0, print_typifier => 1 );
 
 my $sample_text = <<'END_SAMPLE';
 	Avram Noam Chomsky (born December 7, 1928) is an American linguist, cognitive scientist, historian, social critic, and political activist. Sometimes described as "the father of modern linguistics," Chomsky is also one of the founders of the field of cognitive science. He is the author of over 100 books on topics such as linguistics, war, politics, and mass media. Ideologically, he aligns with anarcho-syndicalism and libertarian socialism. He holds a joint appointment as Institute Professor Emeritus at the Massachusetts Institute of Technology (MIT) and laureate professor at the University of Arizona.[22][23]
@@ -24,6 +24,6 @@ END_SAMPLE
 #my @each_words = $summarizer->scan_each();
 #my @each_summs = $summarizer->summ_each("articles/*");
 
-$summarizer->summ_each();
+#summarizer->summ_each();
 
-#$summarizer->summ_file("articles/001.html");
+$summarizer->summ_file("articles/001.html");
