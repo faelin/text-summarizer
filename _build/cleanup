@@ -1,21 +1,6 @@
 do{ my $x = {
-       'Text-Summarizer-1.02' => 1,
-       'Text-Summarizer-1.0201' => 1,
-       'Text-Summarizer-1.0202' => 1,
-       'Text-Summarizer-1.0203' => 1,
-       'Text-Summarizer-1.0204' => 1,
-       'Text-Summarizer-1.0205' => 1,
-       'Text-Summarizer-1.0300' => 1,
-       'Text-Summarizer-1.0310' => 1,
-       'Text-Summarizer-1.0311' => 1,
-       'Text-Summarizer-1.0312' => 1,
-       'Text-Summarizer-1.04' => 1,
-       'Text-Summarizer-1.041' => 1,
-       'Text-Summarizer-1.050' => 1,
-       'Text-Summarizer-1.051' => 1,
-       'Text-Summarizer-1.052' => 1,
-       'Text-Summarizer-1.053' => 1,
        'Text::Summarizer-*' => 1,
-       'blib' => 1
+       'blib' => 1,
+       'Text-Summarizer-2.01' => 1
      };
 $x; }

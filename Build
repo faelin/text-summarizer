@@ -11,7 +11,7 @@ sub magic_number_matches {
   open $FH, '<','_build/magicnum' or return 0;
   my $filenum = <$FH>;
   close $FH;
-  return $filenum == 910869;
+  return $filenum == 803215;
 }
 
 my $progname;
@@ -31,14 +31,14 @@ BEGIN {
   }
   unshift @INC,
     (
-
+     '/Users/redshirt/perl5/lib/perl5'
     );
 }
 
 close(*DATA) unless eof(*DATA); # ensure no open handles to this script
 
 use Module::Build;
-Module::Build->VERSION(q{0.42});
+Module::Build->VERSION(q{0});
 
 # Some platforms have problems setting $^X in shebang contexts, fix it up here
 $^X = Module::Build->find_perl_interpreter;

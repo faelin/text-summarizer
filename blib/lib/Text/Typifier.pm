@@ -1,63 +1,22 @@
 package Text::Typifier;
 
 use v5.14;
-use strict;
-use warnings;
-use Moo;
-use Types::Standard qw/ HashRef ArrayRef Num RegexpRef /;
 use List::AllUtils qw/ zip pairs pairwise /;
 use HTML::TreeBuilder 5 -weak;
 use HTML::Entities qw/ decode_entities /;
 use Text::Markup;
+use strict;
+use warnings;
 use utf8;
 
 use vars qw(@ISA @EXPORT @EXPORT_OK %EXPORT_TAGS $VERSION);
 require Exporter;
 
 @ISA = qw(Exporter);
-@EXPORT = qw();
+@EXPORT = qw( separate typify );
 @EXPORT_OK = qw();
 %EXPORT_TAGS = (all => [@EXPORT_OK]);
-$VERSION = '2.10';
-
-
-
-has type_factors => (
-    is => 'rwp',
-    isa => HashRef[Num],
-    default => sub {{
-                     '010_flat_clause'      => 1,
-                     '011_comma_clause'     => 1,
-                     '020_semicolon_list'   => 1,
-                     '031_sentence_list'    => 1,
-                     '032_bracket_clause'   => 1,
-                     '033_quote_clause'     => 1,
-                     '070_dialog'           => 1,
-                     '080_dateline'         => 1,
-                     '081_title'            => 1,
-                     '082_name'             => 1,
-                     '090_bold'             => 1.5,
-                     '091_italic'           => 1.5,
-                     '092_under'            => 1.5,
-                     '093_strong'           => 2,
-                     '094_title'            => 5,
-                     '095_table'            => 1,
-                     '096_ulist'            => 1,
-                     '097_olist'            => 1,
-                     '098_dlist'            => 1,
-                     '099_faq_div'          => 1,
-                     '100_h1'               => 6,
-                     '101_h2'               => 5,
-                     '102_h3'               => 4,
-                     '103_h4'               => 3,
-                     '104_h5'               => 2,
-                     '105_h6'               => 1,
-                     '200_sentence'         => 1,
-                     '210_paragraph'        => 1,
-                     '220_block_list'       => 1,
-                }},
-);
-
+$VERSION = '2.01';
 
 
 my $delineator = qr/\u002D\u2010-\u2015\u2212\uFE63\uFF0D.;:/ux;  #- ‐ ‒ – — ― ﹣ － . ; :
@@ -187,101 +146,88 @@ my $indent_par = qr/\h+ \V+  (?: \v (?!\h) \V+ | (?=\v(?:\v|\h|\Z)) )++/ux;
 my $catch_all = qr/\h* \V+/ux;
 
 
-has type_formats => (
-	is => 'rwp',
-	isa => HashRef[RegexpRef],
-	default => sub {{
-					#grouping of words delineated by whitespace
-					'010_flat_clause' => $flat_clause,
+my %formats = (
+    #grouping of words delineated by whitespace
+    '010_flat_clause' => qr/$flat_clause/ux,
 
-					#several clauses separated by commas
-					'011_comma_clause' => $comma_clause,
+    #several clauses separated by commas
+    '011_comma_clause' => qr/$comma_clause/ux,
 
-					#list of three or more items, delineated by [,;]
-					'020_semicolon_list' => $semicolon_list,
+    #list of three or more items, delineated by [,;]
+    '020_semicolon_list' => qr/$semicolon_list/ux,
 
-					#one or more clauses, ending in   [:]   followed by a [linear_list]
-					'031_sentence_list' => $sentence_list,
+    #one or more clauses, ending in   [:]   followed by a [linear_list]
+    '031_sentence_list' => qr/$sentence_list/ux,
 
-					#any complex clause that opens and closes with a bracket
-					'032_bracket_clause' => $bracket_clause,
+    #any complex clause that opens and closes with a bracket
+    '032_bracket_clause' => qr/$bracket_clause/ux,
 
-					#complex clause contained in double-quotes
-					'033_quote_clause' => $quote_clause,
+    #complex clause contained in double-quotes
+    '033_quote_clause' => qr/$quote_clause/ux,
 
-					#sentence preceded by     one word or more words followed by a delineating symbol or [\s]
-					'070_dialog' => $dialog,
+    #sentence preceded by     one word or more words followed by a delineating symbol or [\s]
+    '070_dialog' => qr/$dialog/ux,
 
-					#fragment containing a date- or time-stamp
-					'080_dateline' => $dateline,
+    #fragment containing a date- or time-stamp
+    '080_dateline' => qr/$dateline/ux,
 
-					#fragment in all capitals or with trailing vertical whitespace
-					'081_title' => $title,
+    #fragment in all capitals or with trailing vertical whitespace
+    '081_title' => qr/$title/ux,
 
-					#sequence of capitalized words    or    [A-Z] followed by a [.]
-					'082_name' => $name,
+    #sequence of capitalized words    or    [A-Z] followed by a [.]
+    '082_name' => qr/$name/ux,
 
-					#matches text tagged with <b></b>
-					'090_bold' => $html_bold,
+    #matches text tagged with <b></b>
+    '090_bold' => qr/$html_bold/ux,
 
-					#matches text tagged with <i></i>
-					'091_italic' => $html_italic,
+    #matches text tagged with <i></i>
+    '091_italic' => qr/$html_italic/ux,
 
-					#matches text tagged with <strong></strong>
-					'092_under' => $html_under,
+    #matches text tagged with <strong></strong>
+    '092_under' => qr/$html_under/ux,
 
-					#matches text tagged with <strong></strong>
-					'093_strong' => $html_strong,
+    #matches text tagged with <strong></strong>
+    '093_strong' => qr/$html_strong/ux,
 
-					'094_title' => $html_title,
+    '094_title' => qr/$html_title/ux,
 
-					#matches text tagged with <table></table>
-					'095_table' => $html_table,
+    #matches text tagged with <table></table>
+    '095_table' => qr/$html_table/ux,
 
-					'096_ulist' => $html_ulist,
+    '096_ulist' => qr/$html_ulist/ux,
 
-					'097_olist' => $html_olist,
+    '097_olist' => qr/$html_olist/ux,
 
-					'098_dlist' => $html_dlist,
+    '098_dlist' => qr/$html_dlist/ux,
 
-					#matches text tagged with <faq-[...]></faq-[...]>
-					'099_faq_div' => $html_faq_div,
+    #matches text tagged with <faq-[...]></faq-[...]>
+    '099_faq_div' => qr/$html_faq_div/ux,
 
-					'100_h1' => $html_head1,
+    '100_h1' => qr/$html_head1/ux,
 
-					'101_h2' => $html_head2,
+    '101_h2' => qr/$html_head2/ux,
 
-					'102_h3' => $html_head3,
+    '102_h3' => qr/$html_head3/ux,
 
-					'103_h4' => $html_head4,
+    '103_h4' => qr/$html_head4/ux,
 
-					'104_h5' => $html_head5,
+    '104_h5' => qr/$html_head5/ux,
 
-					'105_h6' => $html_head6,
+    '105_h6' => qr/$html_head6/ux,
 
-					#single complete sentence, must end in   [.?!]   or   ["”] followed by [\s][A-Z] or end of text
-					'200_sentence' => $sentence,
+    #single complete sentence, must end in   [.?!]   or   ["”] followed by [\s][A-Z] or end of text
+    '200_sentence' => qr/$sentence/ux,
 
-					#one or more sentences
-					'210_paragraph' => $paragraph,
+    #one or more sentences
+    '210_paragraph' => qr/$paragraph/ux,
 
-					#single alphanumeric chain followed by a delineating symbol    or    symbol followed by [\s]
-					'220_block_list' => $block_list,
-				}}
-);
-
-
-
-has block_formats => (
-	is => 'rwp',
-	isa => ArrayRef[RegexpRef],
-	default => sub { [ $html_block, $block_list, $offset_block, $block_par, $indent_par, $catch_all, ] }
+    #single alphanumeric chain followed by a delineating symbol    or    symbol followed by [\s]
+    '220_block_list' => qr/$block_list/ux,
 );
 
 
 
 sub separate {
-    my $self = shift;
     my $tree = shift;
     my (@extracted, @nodes);
 
@@ -289,8 +235,14 @@ sub separate {
 
     @extracted = extract(@nodes);
 
-    my $branch_reset = join "\n| " => @{$self->block_formats};
-    my $paragraph_match = qr/(   (?| $branch_reset )   (?: \v{2,} | \v (?=\h) | \Z)   )/mux;
+    my $paragraph_match = qr/((?| (?: $html_block )
+                                | (?: $block_list )
+                                | (?: $offset_block )
+                                | (?: $block_par )
+                                | (?: $indent_par )
+                                | (?: $catch_all )
+                              )
+                              (?: \v{2,} | \v (?=\h) | \Z))/mux;
 
     my @paragraphs;
     for my $chunk ( @extracted ) {
@@ -340,7 +292,7 @@ sub extract {
         my $table_string = "<$tag>" . (join "\n" => map { join "\ " => ($_[0]->as_text, $_[1]->as_text) } pairs $node->find('dt', 'dd')) . "</$tag>";
         push @paragraphs => $table_string;
 
-    } elsif ( $tag eq 'div' and (my $class = $node->attr('class')) // '' =~ /^faq-\w+$/ ) {
+    } elsif ( $tag eq 'div' and (my $class = $node->attr('class')) =~ /^faq-\w+$/ ) {
         my @content = $node->detach_content;
         my $concat = '';
         for ( @content ) {
@@ -396,7 +348,6 @@ sub extract {
 
 
 sub typify {
-    my $self = shift;
     my $text = shift;
 
     open( my $temp, "+>:encoding(UTF-8)", "temp/raw.txt" ) or die "Can't open +> 'temp/raw.txt': $!";
@@ -407,7 +358,7 @@ sub typify {
     my $html = $markup_parser->parse(file => "temp/raw.txt");
     my $tree = HTML::TreeBuilder->new->parse_content($html);
 
-    my @paragraphs = $self->separate($tree);
+    my @paragraphs = separate $tree;
 
     my @category;
     CHUNK: for my $chunk (@paragraphs) {
@@ -415,9 +366,8 @@ sub typify {
 
         decode_entities($chunk);
 
-        TEST: for my $format (sort { substr($a,0,3) <=> substr($b,0,3) or $a cmp $b } keys %{$self->type_formats}) {
-        	my $format_block = $self->type_formats->{ $format };
-            my $pattern = qr/$format_block/;
+        TEST: for my $format (sort { substr($a,0,3) <=> substr($b,0,3) or $a cmp $b } keys %formats) {
+            my $pattern = qr/$formats{ $format }/;
             my @scraps;
 
             while ( $chunk =~ m/($pattern)/gmuxs ) {

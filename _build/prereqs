@@ -1,13 +1,14 @@
 do{ my $x = {
-       'build_requires' => {},
-       'conflicts' => {},
-       'recommends' => {},
        'requires' => {
-                       'Algorithm::CurveFit' => 0,
                        'List::AllUtils' => 0,
+                       'Lingua::Stem' => 0,
+                       'Types::Standard' => 0,
                        'Moo' => 0,
-                       'Types::Standard' => 0
+                       'Algorithm::CurveFit' => 0
                      },
+       'conflicts' => {},
+       'build_requires' => {},
+       'recommends' => {},
        'test_requires' => {}
      };
 $x; }

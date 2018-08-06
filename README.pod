@@ -1,55 +1,54 @@
 =pod
  
-=encoding utf-8
-
-
-
+=encoding utf-8  
 
 =head1 NAME
 
-Text::Summarizer - Summarize Bodies of Text
-
-
-
+Text::Summarizer - Summarize Bodies of Text  
 
 =head1 SYNOPSIS
 
-	use Text::Summarizer;
-	
-	# all constructor arguments shown are OPTIONAL and reflect the DEFAULT VALUES of each attribute
-	$summarizer = Text::Summarizer->new(
-		articles_path  => 'articles/*',
-		permanent_path => 'data/permanent.stop',
-		stopwords_path => 'data/stopwrods.stop',
-		store_scanner  => 0,
-		print_scanner  => 0,
-		print_summary  => 0,
-		return_count   => 20,
-		phrase_thresh  => 2,
-		phrase_radius  => 5,
-		freq_constant  => 0.004,
-	);
-	
-	$summarizer = Text::Summarizer->new();
-		# to summarize a string
-	$stopwords = $summarizer->scan_text( 'this is a sample text' );
-	$summary   = $summarizer->summ_text( 'this is a sample text' );
-	    # or to summarize an entire file
-	$stopwords = $summarizer->scan_file("some/file.txt");
-	$summary   = $summarizer->summ_file("some/file.txt");
-		# or to summarize in bulk
-	@stopwords = $summarizer->scan_each("/directory/glob/*");  # if no argument provided, uses the 'articles_path' attribute
-	@summaries = $summarizer->summ_each("/directory/glob/*");  # if no argument provided, uses the 'articles_path' attribute
+  use Text::Summarizer;
+
+    # all constructor arguments shown are OPTIONAL and reflect the DEFAULT VALUES of each attribute
+  $summarizer = Text::Summarizer->new(
+                    articles_path  => 'subdirectory/to/summarize/*',
+                    permanent_path => 'data/permanent.stop',
+                    stopwords_path => 'data/stopwrods.stop',
+                    store_working  => 0,
+                    print_scanner  => 0,
+                    print_summary  => 0,
+                    print_graphs   => 0,
+                    print_typifier => 0,
+                    return_count   => 20,
+                    phrase_thresh  => 2,
+                    phrase_radius  => 5,
+                    freq_constant  => 0.004,
+                );
 
 
+  $summarizer = Text::Summarizer->new();
 
+    # to summarize a string
+  $stopwords = $summarizer->scan_text( 'this is a sample text' );
+  $summary   = $summarizer->summ_text( 'this is a sample text' );
+
+    # or to summarize an entire file
+  $stopwords = $summarizer->scan_file("some/file.txt");
+  $summary   = $summarizer->summ_file("some/file.txt");
+
+    # or to summarize in bulk
+    #   (if no argument provided, uses the 'articles_path' attribute)
+  @stopwords = $summarizer->scan_each("/directory/glob/*");
+  @summaries = $summarizer->summ_each("/directory/glob/*");
 
 =head1 DESCRIPTION
 
-This module allows you to summarize bodies of text into a scored hash of  I<sentences>,  I<phrase-fragments>, and  I<individual words> from the provided text. These scores reflect the weight (or precedence) of the relative text-fragments, i.e. how well they summarize or reflect the overall nature of the text. All of the sentences and phrase-fragments are drawn from within the existing text, and are NOT proceedurally generated.
+This module allows you to summarize bodies of text into a scored hash of  I<sentences>,  I<phrase-fragments>, and  I<individual words> from the provided text.
 
+These scores reflect the weight (or precedence) of the relative text-fragments, i.e. how well they summarize or reflect the overall nature of the text.
 
-
+All of the sentences and phrase-fragments are drawn from within the existing text, and are NOT proceedurally generated.  
 
 =head1 ATTRIBUTES
 
@@ -83,7 +82,7 @@ flag that enables visual graphing of scanner activity (prints to C<STDOUT>)
 
 flag that enables visual charting of summary activity (prints to C<STDOUT>)
 
-=item C<return_count>    – [int]
+=item C<return_count>  – [int]
 
 number of items to list when printing summary list
 
@@ -175,34 +174,31 @@ list of all stopwords, both permanent and proceedural
 
 list of proceedurally generated stopwords, derived by the `scan` function
 
-=back
-
-
-
+=back  
 
 =head1 FUNCTIONS
 
+
 =head2 C<scan>
 
-Scan is a utility that allows the Text::Summarizer to parse through a body of text to find words that occur with unusually high frequency. These words are then stored as new stopwords via the provided C<< stopwords_path >>. Additionally, calling any of the three C<< scan_[...] >> subroutines will return a reference (or array of references) to an unordered list containing the new stopwords.
+Scan is a utility that allows the Text::Summarizer to parse through a body of text to find words that occur with unusually high frequency. These words are then stored as new stopwords via the provided C<< stopwords_path >>. Additionally, calling any of the three C<< scan_[...] >> subroutines will return a reference (or array of references) to an unordered list containing the new stopwords.  $stopwords = $summarizer->scan_text( 'this is a sample text' );
+  $stopwords = $summarizer->scan_file( 'some/file/path.txt' );
+  @stopwords = $summarizer->scan_each( 'some/directory/*' );
+# if no argument provided, uses the 'articles_path' attribute
 
-	$stopwords = $summarizer->scan_text( 'this is a sample text' );
-	$stopwords = $summarizer->scan_file( 'some/file/path.txt' );
-	@stopwords = $summarizer->scan_each( 'some/directory/*' );  # if no argument provided, uses the 'articles_path' attribute
 
 =head2 C<summarize>
 
 Summarizing is, not surprisingly, the heart of the Text::Summarizer. Summarizing a body of text provides three distinct categories of information drawn from the existing text and ordered by relevance to the summary: I<full sentences>, I<phrase-fragments / context-free token streams>, and a list of I<frequently occuring words>.
 
-There are three provided functions for summarizing text documents.
-
-	$summary   = $summarizer->summarize_text( 'this is a sample text' );
-	$summary   = $summarizer->summarize_file( 'some/file/path.txt' );
-	@summaries = $summarizer->summarize_each( 'some/directory/*' );  # if no argument provided, defaults to the 'articles_path' attribute
-		# or their short forms
-	$summary   = $summarizer->summ_text('...');
-	$summary   = $summarizer->summ_file('...');
-	@sumamries = $summarizer->summ_each('...');  # if no argument provided, defaults to the 'articles_path' attribute
+There are three provided functions for summarizing text documents.  $summary   = $summarizer->summarize_text( 'this is a sample text' );
+  $summary   = $summarizer->summarize_file( 'some/file/path.txt' );
+  @summaries = $summarizer->summarize_each( 'some/directory/*' );
+# if no argument provided, defaults to the 'articles_path' attribute   # or their short forms
+  $summary   = $summarizer->summ_text('...');
+  $summary   = $summarizer->summ_file('...');
+  @sumamries = $summarizer->summ_each('...');
+# if no argument provided, defaults to the 'articles_path' attribute
 
 C<< summarize_text >> and C<< summarize_file >> each return a summary hash-ref containing three array-refs, while C<< summarize_each >> returns a list of these hash-refs. These summary hashes take the following form:
 
@@ -218,12 +214,9 @@ C<fragments> => a list of phrase fragments from the given text, scored similarly
 
 =item *
 
-C<words>     => a list of all words in the text, scored by a three-factor system consisting of  I<frequency of appearance>,  I<population standard deviation>, and  I<use in important phrase fragments>.
+C<words>   => a list of all words in the text, scored by a three-factor system consisting of  I<frequency of appearance>,  I<population standard deviation>, and  I<use in important phrase fragments>.
 
-=back
-
-
-
+=back  
 
 =head3 (note about fragments)
 
@@ -259,10 +252,7 @@ when a shorter fragment-scrap (C<I<A>>) is included in the text of a longer scra
 
 when multiple fragments are equivalent (i.e. they consist of the same list of tokens when stopwords are excluded), they are condensed into a single scrap in the form of C<< "(some|word|tokens)" >> such that the fragment now represents the tokens of the scrap (excluding stopwords) regardless of order (refered to as a "context-free token stream")
 
-=back
-
-
-
+=back  
 
 =head1 SUPPORT
 
@@ -270,24 +260,15 @@ Bugs should always be submitted via the project hosting bug tracker
 
 L<https://github.com/faelin/text-summarizer/issues>
 
-For other issues, contact the maintainer.
-
-
-
+For other issues, contact the maintainer.  
 
 =head1 AUTHOR
 
-Faelin Landy <faelin.landy@gmail.com> (current maintainer)
-
-
-
+Faelin Landy <faelin.landy@gmail.com> (current maintainer)  
 
 =head1 CONTRIBUTORS
 
-* Michael McClennen <michaelm@umich.edu>
-
-
-
+* Michael McClennen <michaelm@umich.edu>  
 
 =head1 COPYRIGHT AND LICENSE
 
@@ -296,3 +277,5 @@ Copyright (c) 2018 by the AUTHOR as listed above
 This program is free software: you can redistribute it and/or modify it under the terms of the GNU Lesser General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 
 This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public License for more details.
+
+=cut

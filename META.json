@@ -4,24 +4,25 @@
       "Faelin Landy <faelin.landy@gmail.com>"
    ],
    "dynamic_config" : 1,
-   "generated_by" : "Module::Build version 0.422",
+   "generated_by" : "Module::Build version 0.421",
    "license" : [
       "perl_5"
    ],
    "meta-spec" : {
       "url" : "http://search.cpan.org/perldoc?CPAN::Meta::Spec",
-      "version" : "2"
+      "version" : 2
    },
    "name" : "Text-Summarizer",
    "prereqs" : {
       "configure" : {
          "requires" : {
-            "Module::Build" : "0.42"
+            "Module::Build" : "2.01"
          }
       },
       "runtime" : {
          "requires" : {
             "Algorithm::CurveFit" : "0",
+            "Lingua::Stem" : "0",
             "List::AllUtils" : "0",
             "Moo" : "0",
             "Types::Standard" : "0"
@@ -31,7 +32,11 @@
    "provides" : {
       "Text::Summarizer" : {
          "file" : "lib/Text/Summarizer.pm",
-         "version" : "1.053"
+         "version" : "2.01"
+      },
+      "Text::Typifier" : {
+         "file" : "lib/Text/Typifier.pm",
+         "version" : "2.01"
       }
    },
    "release_status" : "stable",
@@ -43,6 +48,5 @@
          "url" : "https://github.com/faelin/text-summarizer/"
       }
    },
-   "version" : "1.053",
-   "x_serialization_backend" : "JSON::PP version 2.27300"
+   "version" : "2.01"
 }

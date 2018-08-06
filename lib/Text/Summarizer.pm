@@ -4,11 +4,10 @@ use v5.14;
 use strict;
 use warnings;
 use Moo;
-use Types::Standard qw/ Bool Ref Str Int Num InstanceOf Bool /;
+use Types::Standard qw/ Bool Ref Str Int Num InstanceOf Bool FileHandle /;
 use List::AllUtils qw/ max min sum sum0 singleton pairkeys pairvalues pairs all /;
-use Algorithm::CurveFit;
 use Lingua::Stem qw/ stem /;
-use Text::Typifier qw/ typify /;
+use Text::Typifier;
 use utf8;
 
 binmode STDOUT, ':utf8';
@@ -20,279 +19,162 @@ require Exporter;
 @EXPORT = qw();
 @EXPORT_OK = qw();
 %EXPORT_TAGS = (all => [@EXPORT_OK]);
-$VERSION = '2.01';
+$VERSION = '2.11';
 
+
+
+has articles_path => (
+    is => 'rw',
+    isa => Str,
+    default => 'articles/*',
+);
 
 has permanent_path => (
-  is  => 'rw',
-  isa => Str,
-  default => 'data/permanent.stop',
+    is  => 'rw',
+    isa => Str,
+    default => 'data/permanent.stop',
 );
 
 has stopwords_path => (
-  is  => 'rw',
-  isa => Str,
-  default => 'data/stopwords.stop',
+    is  => 'rw',
+    isa => Str,
+    default => 'data/stopwords.stop',
 );
 
-has articles_path => (
-  is => 'rw',
-  isa => Str,
-  default => 'articles/*'
+has typifier => (
+    is => 'rw',
+    isa => InstanceOf["Text::Typifier"],
+    default => sub { Text::Typifier->new(); },
 );
 
 has store_scanner => (
-  is => 'rw',
-  isa => Bool,
-  default => 0,
+	is => 'rw',
+	isa => Bool,
+	default => 0,
 );
 
-has print_scanner => (
-  is => 'rw',
-  isa => Bool,
-  default => 0,
+has scanner => (
+    is => 'rwp',
+    isa => InstanceOf["Text::Summarizer::Scanner"],
+    lazy => 1,
+    default => sub { Text::Summarizer::Scanner->new() },
 );
 
-has print_summary => (
-  is => 'rw',
-  isa => Bool,
-  default => 0,
-);
-
-has print_graphs => (
-  is => 'rw',
-  isa => Bool,
-  default => 0,
-);
-
-has print_working => (
-  is => 'rw',
-  isa => Bool,
-  default => 0,
-);
-
-has print_typifier => (
-  is => 'rw',
-  isa => Bool,
-  default => 0,
+has print_dest => (
+    is => 'rw',
+    isa => FileHandle,
+    lazy => 1,
+    default => sub { open(my $fh, '>-') or die "Can't open >- STDOUT: $!"; $fh },
 );
 
 has return_count => (
-  is => 'rw',
-  isa => Num,
-  default => 20,
+    is => 'rw',
+    isa => Num,
+    default => 20,
 );
 
 has phrase_thresh => (
-  is => 'rw',
-  isa => Int,
-  default => 2,
+    is => 'rw',
+    isa => Int,
+    default => 2,
 );
 
 has phrase_radius => (
-  is => 'rw',
-  isa => Int,
-  default => 5,
+    is => 'rw',
+    isa => Int,
+    default => 5,
 );
 
 has freq_constant => (
-  is => 'rw',
-  isa => Num,
-  default => 0.004,
-);
-
-has watch_count => (
-  is => 'rwp',
-  isa => Int,
-  default => 0,
-);
-
-has stopwords => (
-  is => 'lazy',
-  isa => Ref['HASH'],
-);
-
-has watchlist => (
-  is => 'rwp',
-  isa => Ref['HASH'],
-  lazy => 1,
+    is => 'rw',
+    isa => Num,
+    default => 0.004,
 );
 
 has article_length => (
-  is => 'rwp',
-  isa => Int,
-  default => 0,
-  lazy => 1,
+    is => 'rwp',
+    isa => Int,
+    default => 0,
+    lazy => 1,
 );
 
-has full_text => (
-  is => 'rwp',
-  isa => Str,
+has [qw/ print_scanner print_summary print_graphs print_working print_typifier /] => (
+	is => 'rw',
+	isa => Bool,
+	default => 0,
 );
 
-has types_list => (
-  is => 'rwp',
-  isa => Ref['ARRAY'],
+has [qw/ full_text file_name text_hint /] => (
+    is => 'rwp',
+    isa => Str,
+    default => "",
 );
 
-has types_factor => (
-  is => 'rwp',
-  isa => Ref['HASH'],
-  default => sub {{  '10_flat_clause' => 1,
-                     '011_comma_clause' => 1,
-                     '020_semicolon_list' => 1,
-                     '031_sentence_list' => 1,
-                     '032_bracket_clause' => 1,
-                     '033_quote_clause' => 1,
-                     '070_dialog' => 1,
-                     '080_dateline' => 1,
-                     '081_title' => 1,
-                     '082_name' => 1,
-                     '090_bold' => 1,
-                     '091_italic' => 1,
-                     '092_under' => 1,
-                     '093_strong' => 1,
-                     '094_title' => 1,
-                     '095_table' => 1,
-                     '096_ulist' => 1,
-                     '097_olist' => 1,
-                     '098_dlist' => 1,
-                     '099_faq_div' => 1,
-                     '100_h1' => 1,
-                     '101_h2' => 1,
-                     '102_h3' => 1,
-                     '103_h4' => 1,
-                     '104_h5' => 1,
-                     '105_h6' => 1,
-                     '200_sentence' => 1,
-                     '210_paragraph' => 1,
-                     '220_block_list' => 1,
-                }},
+has [qw/ types_list paragraphs sentences sen_words word_list frag_list /] => (
+    is => 'rwp',
+    isa => Ref['ARRAY'],
+    default => sub { return [] },
 );
 
-has type_scores => (
-  is => 'rwp',
-  isa => Ref['HASH'],
-);
-
-has paragraphs => (
-  is => 'rwp',
-  isa => Ref['ARRAY'],
-);
-
-has sentences => (
-  is => 'rwp',
-  isa => Ref['ARRAY'],
-);
-
-has sen_words => (
-  is => 'rwp',
-  isa => Ref['ARRAY'],
-);
-
-has word_list => (
-  is => 'rwp',
-  isa => Ref['ARRAY'],
-);
-
-has freq_hash => (
-  is => 'rwp',
-  isa => Ref['HASH'],
-);
-
-has clst_hash => (
-  is => 'rwp',
-  isa => Ref['HASH'],
-);
-
-has phrs_hash => (
-  is => 'rwp',
-  isa => Ref['HASH'],
-);
-
-has sigma_hash => (
-  is => 'rwp',
-  isa => Ref['HASH'],
-);
-
-has inter_hash => (
-  is => 'rwp',
-  isa => Ref['HASH'],
-);
-
-has score_hash => (
-  is => 'rwp',
-  isa => Ref['HASH'],
-);
-
-has phrs_list => (
-  is => 'rwp',
-  isa => Ref['HASH'],
-);
-
-has frag_list => (
-  is => 'rwp',
-  isa => Ref['ARRAY'],
-);
-
-has summary => (
-  is => 'rwp',
-  isa => Ref['HASH'],
-);
-
-has file_name => (
-  is => 'rwp',
-  isa => Str,
-);
-
-has text_hint => (
-  is => 'rwp',
-  isa => Str,
+has [qw/ type_scores freq_hash clst_hash phrs_hash sigma_hash inter_hash score_hash phrs_list summary stopwords /] => (
+    is => 'rwp',
+    isa => Ref['HASH'],
+    default => sub { return {} },
 );
 
 
 
-sub _build_watchlist {
-    my $self = shift;
-    my %watchlist;
-    open( my $stopwords_file, '<', $self->stopwords_path )
-        or die "Can't open stopwords scanner file" . $self->stopwords_path . ": $!";
-    chomp and $watchlist{ $_ } = 1 for (<$stopwords_file>);
-    close $stopwords_file;
+sub spawn_scanner {
+	my ($self, %args) = @_;
 
-    return \%watchlist;
-}
+	$self->_set_scanner( Text::Summarizer::Scanner->new(
+							articles_path   =>  $args{articles_path}   //  $self->articles_path,
+							permanent_path  =>  $args{permanent_path}  //  $self->permanent_path,
+							stopwords_path  =>  $args{stopwords_path}  //  $self->stopwords_path,
 
-sub _build_stopwords {
-    my $self = shift;
-    my %stopwords;
+							typifier        =>  $args{typifier}        //  $self->typifier,
 
-    open( my $permanent_file, '<', $self->permanent_path )
-        or die "Can't open stopwords permanent file " . $self->permanent_path . ": $!";
-    chomp and $stopwords{ $_ } = 1 for (<$permanent_file>);
-    close $permanent_file;
-    
-    open( my $stopwords_file, '<', $self->stopwords_path )
-        or die "Can't open stopwords scanner file" . $self->stopwords_path . ": $!";
-    chomp and $stopwords{ $_ } = 1 for (<$stopwords_file>);
-    close $stopwords_file;
+							store_scanner   =>  $args{store_scanner}   //  $self->store_scanner,
+							print_dest      =>  $args{print_dest}      //  $self->print_dest,
+							return_count    =>  $args{return_count}    //  $self->return_count,
 
-    return \%stopwords;
-}
+							phrase_thresh   =>  $args{phrase_thresh}   //  $self->phrase_thresh,
+							phrase_radius   =>  $args{phrase_radius}   //  $self->phrase_radius,
+							freq_constant   =>  $args{freq_constant}   //  $self->freq_constant,
 
-sub _store_stopwords {
-    my $self = shift;
-    open( my $stopwords_file, ">", $self->stopwords_path)
-        or die "Can't open stopwords scanner file " . $self->stopwords_path . ": $!";
-    grep { print $stopwords_file "$_\n" } sort keys %{$self->watchlist} if $self->store_scanner;
-    close $stopwords_file;
+							print_scanner   =>  $args{print_scanner}   //  $self->print_scanner,
+							print_graphs    =>  $args{print_graphs}    //  $self->print_graphs,
+							print_working   =>  $args{print_working}   //  $self->print_working,
 
-    return $self;
+							full_text       =>  $args{full_text}       //  $self->full_text,
+							file_name       =>  $args{file_name}       //  $self->file_name,
+							text_hint       =>  $args{text_hint}       //  $self->text_hint,
+
+							paragraphs      =>  $args{paragraphs}      //  $self->paragraphs,
+							sentences       =>  $args{sentences}       //  $self->sentences,
+							sen_words       =>  $args{sen_words}       //  $self->sen_words,
+							word_list       =>  $args{word_list}       //  $self->word_list,
+							frag_list       =>  $args{frag_list}       //  $self->frag_list,
+							types_list      =>  $args{types_list}      //  $self->types_list,
+
+							type_scores	    =>  $args{type_scores}	   //  $self->type_scores,
+							freq_hash	    =>  $args{freq_hash}	   //  $self->freq_hash,
+							clst_hash	    =>  $args{clst_hash}	   //  $self->clst_hash,
+							phrs_hash	    =>  $args{phrs_hash}	   //  $self->phrs_hash,
+							sigma_hash	    =>  $args{sigma_hash}	   //  $self->sigma_hash,
+							inter_hash	    =>  $args{inter_hash}	   //  $self->inter_hash,
+							score_hash	    =>  $args{score_hash}	   //  $self->score_hash,
+							phrs_list	    =>  $args{phrs_list}	   //  $self->phrs_list,
+							stopwords	    =>  $args{stopwords}	   //  $self->stopwords,
+					)
+				);
+
+	return $self->scanner;
 }
 
 
 
-sub scan_text {
+sub summarize_text {
     my ($self, $text, $path) = @_;
 
     $self->_set_file_name( '' );
@@ -304,91 +186,96 @@ sub scan_text {
     }
 
     $self->_set_text_hint( '"' . substr($text,0,50) . '...' . substr($text,-30) . '"' );
-    $self->tokenize( $text ); #breaks the provided file into sentences and individual words
-    $self->_build_stopwords;
 
-    $self->_build_freq_hash;
-    $self->_build_clst_hash;
-    $self->_build_phrs_hash;
-    $self->_build_sigma_hash;
-    $self->_build_frag_list;
- 
-    $self->develop_stopwords; #analyzes the frequency and clustering of words within the provided file
-    $self->_store_stopwords;
-
-    return $self->watchlist;
-}
-
-sub scan_file {
-    my ($self, $file_path) = @_;
-    open( my $file, '<:utf8', $file_path )
-       or die "Can't open file $file_path for scanning: $!";
-
-    return $self->scan_text( $file, $file_path );
-}
-
-sub scan_each {
-    my ($self, $dir_path) = @_;
-
-    return map { $self->scan_file( $_ ) } glob( $dir_path // $self->articles_path );
-}
-
-
-
-sub summarize_text {
-    my ($self, $text, $path) = @_;
-
-    $self->_set_file_name( '' );
-    if ( ref $text ) {
-        $self->_set_file_name( $path );
-        $text = join "\n" => map { $_ } <$text>;
-    }
-
-    $self->_set_text_hint( '"' . substr($text,0,50) . '...' . substr($text,-30) . '"' );
     $self->tokenize($text); #breaks the provided file into sentences and individual words 
-    $self->_build_stopwords;
 
+    $self->_build_stopwords;
     $self->_build_freq_hash;
     $self->_build_clst_hash;
     $self->_build_phrs_hash;
     $self->_build_sigma_hash;
     $self->_build_frag_list;
 
-    $self->analyze_phrases; #analyzes the frequency and clustering of words within the provided file  return $self->summary;
+    return $self->analyze_phrases; #analyzes the frequency and clustering of words within the provided file  return $self->summary;
 }
 
 sub summarize_file {
-    my ($self, $file_path) = @_;
-    open( my $file, '<:utf8', $file_path )
-        or die "Can't open file $file_path for summarizing: $!";
+    my ($self, $file) = @_;
+    my $fh;
 
-    return $self->summarize_text( $file, $file_path );
+    if ( ref $file ) {
+        $fh = $file;
+
+        return $self->summarize_text( $fh, '<unknown path>' );
+
+    } else {
+        open( $fh, '<:utf8', $file )
+            or die "Can't open file $file for summarizing: $!";
+
+        return $self->summarize_text( $fh, $file );
+    }
 }
 
 sub summarize_each {
     my ($self, $dir_path) = @_;
 
-    return map { $self->summarize_file( $_ ) } glob( $dir_path // $self->articles_path );
+	$self->_build_stopwords;
+
+	my @summaries_ref;
+
+  	for ( glob($dir_path // $self->articles_path) ) {
+  		my $filepath = $_;
+
+  		open( my $fh, '<:utf8', $filepath )
+            or die "Can't open file $filepath for summarizing: $!";
+
+	    $self->_set_file_name( '' );
+	    $self->_set_text_hint( '' );
+
+	    $self->_set_file_name( $filepath );
+	    my $text = join "\n" => map { $_ } <$fh>;
+
+	    $self->_set_text_hint( '"' . substr($text,0,50) . '...' . substr($text,-30) . '"' );
+
+	    $self->tokenize($text); #breaks the provided file into sentences and individual words 
+
+	    $self->_build_stopwords;
+	    $self->_build_freq_hash;
+	    $self->_build_clst_hash;
+	    $self->_build_phrs_hash;
+	    $self->_build_sigma_hash;
+	    $self->_build_frag_list;
+
+	    $self->analyze_phrases; #analyzes the frequency and clustering of words within the provided file  return $self->summary;
+
+	    push @summaries_ref => $self->summary
+  	}
+
+    return @summaries_ref;
 }
 
 sub summ_text { return shift->summarize_text(@_); }
 sub summ_file { return shift->summarize_file(@_); }
 sub summ_each { return shift->summarize_each(@_); }
 
+sub scan_text { return shift->scanner->scan_text(@_); }
+sub scan_file { return shift->scanner->scan_file(@_); }
+sub scan_each { return shift->scanner->scan_each(@_); }
+
 
 
 sub tokenize {
     my ( $self, $text ) = @_;
 
-    my @types_list = typify($text);
+    my @types_list = $self->typifier->typify($text);
     my @paragraphs = pairkeys @types_list;
     my %type_scores;
  
     foreach my $category ( pairvalues @types_list ) {
        foreach ( pairs @$category ) {
             my ( $type, $scraps ) = @$_;
-            $type_scores{lc $_} += ($self->types_factor->{$type} // 1) for
-                map { grep { !$self->stopwords->{lc $_} and /[A-Za-z]/ } /\b[\w-]+\b/gx } (ref $scraps eq 'ARRAY' ? @$scraps : $$scraps );
+            $type_scores{lc $_} += ($self->typifier->type_factors->{$type} // 1) for
+               grep { !$self->stopwords->{lc $_} and /[A-Za-z]/ } map { /\b[\w-]+\b/gx } (ref $scraps eq 'ARRAY' ? @$scraps : $$scraps );
         }
     }
 
@@ -417,6 +304,25 @@ sub tokenize {
     $self->_set_type_scores( \%type_scores);
 
     return $self;
+}
+
+
+
+sub _build_stopwords {
+    my $self = shift;
+    my %stopwords;
+
+    open( my $permanent_file, '<', $self->permanent_path )
+        or die "Can't open stopwords permanent file " . $self->permanent_path . ": $!";
+    chomp and $stopwords{ $_ } = 1 for (<$permanent_file>);
+    close $permanent_file;
+    
+    open( my $stopwords_file, '<', $self->stopwords_path )
+        or die "Can't open stopwords scanner file" . $self->stopwords_path . ": $!";
+    chomp and $stopwords{ $_ } = 1 for (<$stopwords_file>);
+    close $stopwords_file;
+
+    return \%stopwords;
 }
 
 
@@ -601,125 +507,6 @@ sub _build_frag_list {
 
 
 
-sub develop_stopwords {
-    my $self = shift;
-
-    my %score_hash; #*score_hash* contains score values for words in those phrases
-    $score_hash{$_}++ for keys %{$self->phrs_hash};
-    JOIN: for my $fragment (@{$self->frag_list}) {
-
-        #compile scraps for scoring
-        my $scrap  = join ' ' => map { $score_hash{$fragment->{'scrap'}->{$_}}++;
-        $fragment->{'scrap'}->{$_} } sort { $a <=> $b } keys %{$fragment->{'scrap'}};
-
-        for my $word (split ' ' => $scrap) {
-            $score_hash{$word} += $self->freq_hash->{$word} // 0;
-            $score_hash{$word} += $self->sigma_hash->{$word} // 0;
-            $score_hash{$word} -= $fragment->{'counts'}->{$word} // 0;
-        }
-    } 
-    grep { delete $score_hash{$_} if $self->stopwords->{$_} } keys %score_hash;
-
-
-    my @word_keys = sort { $score_hash{$b} <=> $score_hash{$a} or $a cmp $b } keys %score_hash;
-    my $highest = $score_hash{$word_keys[0]};
-    my $longest = max map { length } @word_keys;
-
-    $score_hash{$_} = 40 * $score_hash{$_} / $highest for keys %score_hash;
-    @word_keys = reverse grep { $score_hash{$_} >= 1 } @word_keys;
-
-    my @scores = map { $score_hash{$_} } @word_keys;
-    my @low    = @scores[ 0..(int scalar @scores / 2 - 1.5) ];
-    my @high   = @scores[ (int scalar @scores / 2 + 1)..(int scalar @scores - 1) ];
-    my @LM     = @low[  (int scalar @low / 2 - 0.5)..(int scalar @low / 2)   ];
-    my @UM     = @high[ (int scalar @high / 2 - 0.5)..(int scalar @high / 2) ];
-    my $Q1     = sum( @LM ) / scalar @LM;
-    my $Q3     = sum( @UM ) / scalar @UM;
-    my $IQR    = $Q3 - $Q1;
-    my $lower  = $Q1;
-    my $upper  = $Q3 + 1.5 * $IQR;
-
-    my @graph_data = grep { $_ > $lower and $_ < $upper } map { $score_hash{$_} } @word_keys;
-    my $n = scalar @graph_data;
-
-    if ($n > 4) {
-        my $average = sum( @graph_data ) / $n;
-        my @xdata = 1..$n; # The data corresponsing to $variable
-        my @ydata = @graph_data; # The data on the other axis
-        my $max_iter = 100; # maximum iterations
-        my @params_line = (
-            # Name      Guess      Accuracy
-            ['a',       0,         0.00001],
-            ['b',       $average,  0.00001],
-            ['c',       $highest,  0.00001],
-        );
-
-        Algorithm::CurveFit->curve_fit(
-            formula             =>  'a + b * x + c * x^2',
-            params              =>  \@params_line,
-            xdata               =>  \@xdata,
-            ydata               =>  \@ydata,
-            maximum_iterations  =>  $max_iter,
-        );
-
-        my ($a, $b, $c) = ($params_line[0]->[1],$params_line[1]->[1],$params_line[2]->[1]);
-        my %watchlist = %{$self->watchlist // {} };
-
-        KEY: for my $index ( reverse 1..scalar @word_keys ) {
-            my $score  = $a + $b * $index + $c * $index**2;
-            $watchlist{$word_keys[$index - 1]}++ if $score >= $lower and $score < $score_hash{$word_keys[$index - 1]};
-        }
-
-        $self->_set_watchlist( \%watchlist );
-
-
-        if ($self->print_scanner) {
-            say "\nSCANNING:\n" . $self->full_text if $self->print_working;
-
-            say "\n\n———————————————————————————————————————————\n\n";
-
-            say "[file name] " . $self->file_name if $self->file_name;
-            say "[text hint] " . $self->text_hint;
-
-            say "\n---SCANNER GRAPHS---\n";
-
-            say "KNOWN:";
-            KEY: for my $index ( reverse 0..$#word_keys ) {
-                my $format = "%" . $longest . "s|%s\n";
-                my $score = $score_hash{$word_keys[$index]};
-                my $score_string = sprintf " %5.2f |" => $score;
-                for (0..max($score, $upper)) {
-                    if ($score > $lower and $score < $upper) {
-                        $score_string .= '+' if $_ <= $score;
-                    } else {
-                        $score_string .= ']' if $_ == int $upper;
-                        $score_string .= '-' if $_ <= int $score;
-                        $score_string .= ' ' if $_ >  int $score;
-                        $score_string .= '[' if $_ == int $lower;
-                    }
-                }
-                printf $format => ($word_keys[$index], $score_string);
-            }
-
-            printf "\n[whiskers] lower = %.2f; upper = %.2f\n\n" => ($lower, $upper);
-
-            say "CALCULATED:";
-            KEY: for my $index ( reverse 1..scalar @word_keys ) {
-                my $format = "%" . $longest . "s|%s\n";
-                my $score  = $a + $b * $index + $c * $index**2;
-                my $score_string = sprintf " %5.2f |%s" => $score,
-                    ($score >= $lower and $score < $score_hash{$word_keys[$index - 1]} ? '-' x $score : '+' x $score);
-                printf $format => $word_keys[$index - 1], $score_string;
-            }
-            say "\n";
-        }
-    }
-
-    return $self;
-}
-
-
-
 sub analyze_phrases {
     my $self = shift;
 
@@ -846,83 +633,84 @@ sub analyze_phrases {
 sub show_summary {
     my $self = shift;
 
+    my $fh = ($self->print_dest);
 
     if ($self->print_working) {
-        say "\nSUMMARIZING:\n" . $self->full_text;
+        say $fh "\nSUMMARIZING:\n" . $self->full_text;
     }
 
 
     if ($self->print_typifier) {
-        say "\n\n———————————————————————————————————————————\n\n";
+        say $fh "\n\n———————————————————————————————————————————\n\n";
 
-        say "[file name] " . $self->file_name if $self->file_name;
-        say "[text hint] " . $self->text_hint;
+        say $fh "[file name] " . $self->file_name if $self->file_name;
+        say $fh "[text hint] " . $self->text_hint;
 
-        say "\n---TEXT TYPE LIST---\n";
+        say $fh "\n---TEXT TYPE LIST---\n";
 
         foreach ( pairs @{$self->types_list} ) {
             my ( $paragraph, $category ) = @$_;
 
-            say "PARAGRAPH:\n$paragraph\n";
+            say $fh "PARAGRAPH:\n$paragraph\n";
 
-            say "BREAKDOWN:";
+            say $fh "BREAKDOWN:";
             foreach ( pairs @$category ) {
                 my ( $type, $scraps ) = @$_;
                 if (ref $scraps eq 'ARRAY') {
                     my $format = "%s\n" . ("\t• %s\n"x@$scraps) . "\n";
-                    printf $format => ($type, @$scraps);
+                    printf $fh $format => ($type, @$scraps);
                 }
             }
-            say "\n";
+            say $fh "\n";
         }
     } 
 
 
     if ($self->print_summary) {
-        say "\n\n———————————————————————————————————————————\n\n";
+        say $fh "\n\n———————————————————————————————————————————\n\n";
 
-        say "[file name] " . $self->file_name if $self->file_name;
-        say "[text hint] " . $self->text_hint;
+        say $fh "[file name] " . $self->file_name if $self->file_name;
+        say $fh "[text hint] " . $self->text_hint;
 
-        say "\n---SUMMARY CHARTS---\n";
+        say $fh "\n---SUMMARY CHARTS---\n";
 
         my ($sentences, $fragments) = @{$self->summary}{'sentences','fragments'};
 
         SUMMARY: {
-            say "SUMMARY:";
+            say $fh "SUMMARY:";
             my @sentence_keys = sort { $sentences->{$b} <=> $sentences->{$a} or $a cmp $b} keys %$sentences;
             my $highest = $sentences->{$sentence_keys[0]};
             for my $sen ( @sentence_keys[0..min($self->return_count,$#sentence_keys)] ) {
                 my $score = 100*log($sentences->{$sen})/log($highest);
-                printf "%d => %s\n" => $score, $sen;
+                printf $fh "%d => %s\n" => $score, $sen;
             }
-            say "\n";
+            say $fh "\n";
         }
 
         PHRASES: {
-            say "PHRASES:";
+            say $fh "PHRASES:";
             my @phrase_keys = sort { $fragments->{$b} <=> $fragments->{$a} or $a cmp $b } keys %$fragments;
             my $highest = $fragments->{$phrase_keys[0]};
             for my $phrase ( @phrase_keys[0..min($self->return_count,$#phrase_keys)] ) {
                 my $score = 100*log($fragments->{$phrase})/log($highest);
-                printf "%d => %s\n" => $score, $phrase;
+                printf $fh "%d => %s\n" => $score, $phrase;
             }
-            say "\n";
+            say $fh "\n";
         }
     }
 
     if ($self->print_graphs) {
-        say "\n\n———————————————————————————————————————————\n\n";
+        say $fh "\n\n———————————————————————————————————————————\n\n";
 
-        say "[file name] " . $self->file_name if $self->file_name;
-        say "[text hint] " . $self->text_hint;
+        say $fh "[file name] " . $self->file_name if $self->file_name;
+        say $fh "[text hint] " . $self->text_hint;
 
-        say "\n---SUMMARY GRAPHS---\n";
+        say $fh "\n---SUMMARY GRAPHS---\n";
 
         my ($words, $typed, $merged, $stemmed) = @{$self->summary}{'words','typed','merged','stemmed'};
 
         WORDS: {
-            say "  WORDS:";
+            say $fh "  WORDS:";
             my @word_keys = sort { $words->{$b} <=> $words->{$a} or $a cmp $b } keys %$words;
             my $highest = $words->{$word_keys[0]};
             my $longest = max map {length} @word_keys;
@@ -930,13 +718,13 @@ sub show_summary {
             KEY: for my $word ( @word_keys[0..min($self->return_count,$#word_keys)] ) {
                 my $format = "%" . $longest . "s| %2s |%s\n";
                 my $score = int(40*$words->{$word}/$highest);
-                printf $format => ( $word, $score, "-" x $score ) if $score > 2;
+                printf $fh $format => ( $word, $score, "-" x $score ) if $score > 2;
             }
-            say "\n";
+            say $fh "\n";
         }
 
         TYPES: {
-            say "  TYPES:";
+            say $fh "  TYPES:";
             my @type_keys = sort { $typed->{$b} <=> $typed->{$a} or $a cmp $b } keys %$typed;
             my $highest = $typed->{$type_keys[0]};
             my $longest = max map {length} @type_keys;
@@ -944,13 +732,13 @@ sub show_summary {
             KEY: for my $word ( @type_keys[0..min($self->return_count,$#type_keys)] ) {
                 my $format = "%" . $longest . "s| %2s |%s\n";
                 my $score = int(40*$typed->{$word}/$highest);
-                printf $format => ( $word, $score, "-" x $score ) if $score > 2;
+                printf $fh $format => ( $word, $score, "-" x $score ) if $score > 2;
             }
-            say "\n";
+            say $fh "\n";
         }
 
         MERGED: {
-            say "  MERGED:";
+            say $fh "  MERGED:";
             my @merge_keys = sort { $merged->{$b} <=> $merged->{$a} or $a cmp $b } keys %$merged;
             my $highest = $merged->{$merge_keys[0]};
             my $longest = max map {length} @merge_keys;
@@ -958,13 +746,13 @@ sub show_summary {
             KEY: for my $word ( @merge_keys[0..min($self->return_count,$#merge_keys)] ) {
                 my $format = "%" . $longest . "s| %2s |%s\n";
                 my $score = int(40*$merged->{$word}/$highest);
-                printf $format => ( $word, $score, "-" x $score ) if $score > 2;
+                printf $fh $format => ( $word, $score, "-" x $score ) if $score > 2;
             }
-            say "\n";
+            say $fh "\n";
         }
 
         STEMMED: {
-            say "  STEMMED:";
+            say $fh "  STEMMED:";
             my @stem_keys = sort { $stemmed->{$b} <=> $stemmed->{$a} or $a cmp $b } keys %$stemmed;
             my $highest = $stemmed->{$stem_keys[0]};
             my $longest = max map {length} @stem_keys;
@@ -972,9 +760,9 @@ sub show_summary {
             KEY: for my $word ( @stem_keys[0..min($self->return_count,$#stem_keys)] ) {
                 my $format = "%" . $longest . "s| %2s |%s\n";
                 my $score = int(40*$stemmed->{$word}/$highest);
-                printf $format => ( $word, $score, "-" x $score ) if $score > 2;
+                printf $fh $format => ( $word, $score, "-" x $score ) if $score > 2;
             }
-            say "\n";
+            say $fh "\n";
         }
     }
 }
@@ -986,24 +774,31 @@ sub show_summary {
 __END__  
 
 
+
 =pod
  
 =encoding utf-8  
+
+
 
 =head1 NAME
 
 Text::Summarizer - Summarize Bodies of Text  
 
+
+
 =head1 SYNOPSIS
 
-  use Text::Summarizer;
+    use Text::Summarizer;
 
-    # all constructor arguments shown are OPTIONAL and reflect the DEFAULT VALUES of each attribute
-  $summarizer = Text::Summarizer->new(
-                    articles_path  => 'subdirectory/to/summarize/*',
+      # all constructor arguments shown are OPTIONAL and reflect the DEFAULT VALUES of each attribute
+    $summarizer = Text::Summarizer->new(
+                    articles_path  => 'directory/to/summarize/*',
                     permanent_path => 'data/permanent.stop',
                     stopwords_path => 'data/stopwrods.stop',
-                    store_working  => 0,
+                    typifier       => Text::Typifier->new();
+                    scanner        => Text::Summarizer::Scanner->new();
+                    print_working  => 0,
                     print_scanner  => 0,
                     print_summary  => 0,
                     print_graphs   => 0,
@@ -1014,179 +809,243 @@ Text::Summarizer - Summarize Bodies of Text
                     freq_constant  => 0.004,
                 );
 
+      # creates a new Text::Summarizer::Scanner with all attributes set to match those of the current  $summarizer  object
+    $summarizer->spawn_scanner( print_scanner => 1, store_scanner => 1 );
 
-  $summarizer = Text::Summarizer->new();
+      # to summarize a string
+    $stopwords = $summarizer->scan_text('your text goes here')->watchlist;
+    $summary   = $summarizer->summ_text('your text goes here')->summary;
 
-    # to summarize a string
-  $stopwords = $summarizer->scan_text( 'this is a sample text' );
-  $summary   = $summarizer->summ_text( 'this is a sample text' );
+      # or to summarize an entire file
+    $stopwords = $summarizer->scan_file("/some/file.txt")->watchlist;
+    $summary   = $summarizer->summ_file("/some/file.txt")->summary;
 
-    # or to summarize an entire file
-  $stopwords = $summarizer->scan_file("some/file.txt");
-  $summary   = $summarizer->summ_file("some/file.txt");
+      # or to summarize in bulk
+      #   (if no argument provided, uses the 'articles_path' attribute)
+    @stopwords_by_article = $summarizer->scan_each("/directory/glob/*");
+    @summaries_by_article = $summarizer->summ_each("/directory/glob/*");
 
-    # or to summarize in bulk
-    #   (if no argument provided, uses the 'articles_path' attribute)
-  @stopwords = $summarizer->scan_each("/directory/glob/*");
-  @summaries = $summarizer->summ_each("/directory/glob/*");
+
 
 =head1 DESCRIPTION
 
 This module allows you to summarize bodies of text into a scored hash of  I<sentences>,  I<phrase-fragments>, and  I<individual words> from the provided text.
 
-These scores reflect the weight (or precedence) of the relative text-fragments, i.e. how well they summarize or reflect the overall nature of the text.
+These scores reflect the weight (precedence) of the relative text-fragments, i.e. how well they summarize or reflect the overall nature of the text. This scoring is determined through a variety of factors, including frequency distribution, clustering, and sentence-structure.
 
-All of the sentences and phrase-fragments are drawn from within the existing text, and are NOT proceedurally generated.  
+N.B.
+All of the sentences are drawn from within the existing text, and are NOT proceedurally generated.
+
+
 
 =head1 ATTRIBUTES
 
-X< read-write accessible >
+=head2 read-write accessible
 
-B< The following constructor attributes are available to the user, and can be accessed/modified at any time via C<< $summarizer->_set_[attribute] >> >:
+B< The following constructor attributes are available to the user, and can be accessed/modified at any time via the form
+
+    $summarizer->articles_path(...);
 
 =over 8
 
-=item C<articles_path>   – [directory]
+=item C<articles_path> – C< [glob] >
 
-folder containing some text-files you wish to summarize
+glob pointing to a folder containing some text-files you wish to summarize (only necessary if you wish to bulk-process files).
 
-=item C<permanent_path>  – [filepath]
+defaults to 'articles/*'
 
-file containing a base set of universal stopwords (defaults to English stopwords)
+=item C<permanent_path> – C< [filepath] >
 
-=item C<stopwords_path>  – [filepath]
+file containing a non-procedural, base set of stopwords (one per line).
 
-file containing a list of new stopwords identified by the C<scan> function
+defaults to C< data/permanent.stop >
 
-=item C<store_scanner>   – [boolean]
+=item C<stopwords_path> – C< [filepath] >
 
-flag for storing new stopwords in the file indicated by C<stopwords_path>
+file containing a procedural list of stopwords, usually generated by a Text::Summarizer::Scanner object
 
-=item C<print_scanner>   – [boolean]
+defaults to C< data/stopwords.stop >
 
-flag that enables visual graphing of scanner activity (prints to C<STDOUT>)
+=item C<print_dest> — C< [FileHandle] >
 
-=item C<print_summary>   – [boolean]
+sets the output destination for the following four 'print' flags
 
-flag that enables visual charting of summary activity (prints to C<STDOUT>)
+defaults to STDOUT
 
-=item C<return_count>  – [int]
+=item C<print_summary> – C< [boolean] >
 
-number of items to list when printing summary list
+flag that enables visual charting of summary activity
 
-=item C<phrase_thresh>   – [int]
+=item C<print_graphs> – C< [boolean] >
 
-minimum number of word tokens allowed in a phrase
+flag that enables visual graphing of word-scoring
 
-=item C<phrase_radius>   – [int]
+=item C<print_working> – C< [boolean] >
+
+flag that enables a printout of the entire body of text currently being summarized (recommended for debugging only)
+
+=item C<print_typifier> – C< [boolean] >
+
+flag that enables visualization of the Text::Typifier syntactic forest
+
+=item C<return_count> – C< [int] >
+
+number of items to list when printing charts/graphs
+
+=item C<phrase_thresh> – C< [int] >
+
+minimum number of word tokens allowed in a 'phrase' unit
+
+=item C<phrase_radius> – C< [int] >
 
 distance iterated backward and forward from a given word when establishing a phrase (i.e. maximum length of phrase divided by 2)
 
-=item C<freq_constant>   – [float]
+=item C<freq_constant> – C< [float] >
 
 mathematical constant for establishing minimum threshold of occurence for frequently occuring words (defaults to C<< 0.004 >>)
 
 =back
 
-X< read only >
+=head2 read-only
 
-B< These attributes are read-only, and can be accessed via C<< $summarizer->[attribute] >> >:
+B< These attributes are read-only, and can be accessed via the form
+
+    $summarizer->full_text();
 
 =over 8
 
-=item C<full_text> – [string]
+=item C<stopwords> - C< [hash-ref] >
 
-all the lines of the provided text, joined together
+list of all stopwords loaded into the Text::Summarizer, with words as keys
 
-=item C<sentences> – [array-ref]
+=item C<article_length> — C< [int] >
+
+number of individual words in the article (useful for statistical analysis)
+
+=item C<full_text> – C< [string] >
+
+all the lines of the provided text, joined together into a single continuous string
+
+=item C<types_list> — C< [array-ref] >
+
+complex pair-wise structure containing text-paragraphs as "keys", matched with an array containing pairs of C< type => scraps > -- best understood through L<Data::Dumper> or the like
+
+=item C<type_scores> — C< [hash_ref] >
+
+hash matching words with their L<Text::Typifier> scores based on usage in sentence-structure multiplied by a scaling factor for each word-type
+
+=item C<paragraphs> — C< [array-ref] >
+
+list containing each paragraph as separated by a L<Text::Typifier>
+
+=item C<sentences> – C< [array-ref] >
 
 list of each sentence found in the provided text
 
-=item C<sen_words> – [array-ref]
+=item C<sen_words> – C< [array-ref] >
 
 for each sentence, contains an array of each word in order
 
-=item C<word_list> – [array-ref]
+=item C<word_list> – C< [array-ref] >
 
 each individual word of the entire text, in order (token stream)
 
-=item C<freq_hash> – [hash-ref]
+=item C<freq_hash> – C< [hash-ref] >
 
 all words that occur more than a specified threshold, paired with their frequency of occurence
 
-=item C<clst_hash> – [hash-ref]
+=item C<clst_hash> – C< [hash-ref] >
 
 for each word in the text, specifies the position of each occurence of the word, both relative to the sentence it occurs in and absolute within the text
 
-=item C<phrs_hash> – [hash-ref]
+=item C<phrs_hash> – C< [hash-ref] >
 
 for each word in the text, contains a phrase of radius I<r> centered around the given word, and references the sentence from which the phrase was gathered
 
-=item C<sigma_hash> – [hash-ref]
+=item C<sigma_hash> – C< [hash-ref] >
 
 gives the population standard deviation of the clustering of each word in the text
 
-=item C<inter_hash> – [hash-ref]
+=item C<inter_hash> – C< [hash-ref] >
 
 list of each chosen phrase-fragment-scrap, paired with its score
 
-=item C<score_hash> – [hash-ref]
+=item C<score_hash> – C< [hash-ref] >
 
 list of each word in the text, paired with its score
 
-=item C<phrs_list>  – [hash-ref]
+=item C<phrs_list>  – C< [hash-ref] >
 
 list of complete sentences that each scrap was drawn from, paired with its score
 
-=item C<frag_list>  – [array-ref]
+=item C<frag_list>  – C< [array-ref] >
 
 for each chosen scrap, contains a hash of: the pivot word of the scrap; the sentence containing the scrap; the number of occurences of each word in the sentence; an ordered list of the words in the phrase from which the scrap was derived
 
-=item C<file_name> – [string]
+=item C<file_name> – C< [string] >
 
 the filename of the current text-source (if text was extracted from a file)
 
-=item C<text_hint> – [string]
+=item C<text_hint> – C< [string] >
 
 brief snippet of text containing the first 50 and the final 30 characters of the current text
 
-=item C<summary> – [hash-ref]
+=item C<summary> – C< [hash-ref] >
 
 scored lists of each summary sentence, each chosen scrap, and each frequently-occuring word
 
-=item C<stopwords> - [hash-ref]
-
-list of all stopwords, both permanent and proceedural
-
-=item C<watchlist> - [hash-ref]
-
-list of proceedurally generated stopwords, derived by the `scan` function
-
 =back  
 
-=head1 FUNCTIONS
 
+
+=head1 METHODS
+
+=head2 C<spawn_scanner>
+
+Populates the C<scanner> attribute with a new Text::Summarizer::Scanner object that has the EXACT SAME attribute settings as the calling Text::Summarizer. This method should ALMOST ALWAYS be called after establishing your Text::Summarizer object. This way, all pertinent settings are mirrored in this object's C<scanner>-object attribute.
+
+Any attribute can be overridden by simply including it (and the preferred value) in the C<spawn_scanner> argument
 
 =head2 C<scan>
 
-Scan is a utility that allows the Text::Summarizer to parse through a body of text to find words that occur with unusually high frequency. These words are then stored as new stopwords via the provided C<< stopwords_path >>. Additionally, calling any of the three C<< scan_[...] >> subroutines will return a reference (or array of references) to an unordered list containing the new stopwords.  $stopwords = $summarizer->scan_text( 'this is a sample text' );
-  $stopwords = $summarizer->scan_file( 'some/file/path.txt' );
-  @stopwords = $summarizer->scan_each( 'some/directory/*' );
-# if no argument provided, uses the 'articles_path' attribute
+Scan is a utility that allows the Text::Summarizer to parse through a body of text to find words that occur with unusually high frequency. These words are then stored as new stopwords via the provided C<< stopwords_path >>. Additionally, calling any of the three C<< scan_C< [...] > >> subroutines will return a reference (or array of references) to an unordered list containing the new stopwords.
+
+	$scanner = $summarizer->scanner;
+
+    $scanner->scan_text( 'this is a sample text' );
+    $scanner->scan_file( 'some/file/path.txt' );
+    $scanner->scan_each( 'some/glob/*' );    # if no argument provided, uses the 'articles_path' attribute
+
+After scanning, one can access the generated stopwords list by calling C<watchlist> on the scanner object or by chaining it off of the C<scan_...> call. Additionally, the C<scan_each> function will return an array of array-refs that each point to an article summary from the provided glob.
+
+	$stopwords_hashref  = $scanner->scan_text(...)->watchlist;
+	$stopwords_hashref  = $scanner->scan_file(...)->watchlist;
+	$stopwords_arrayref = $scanner->scan_each(...);
+
+To store the watchlist into the stopwords-file indicated by the C<stopwords_path> attribute, set the C<store_scanner> attribute on your Scanner object.
+
+	$scanner->store_scanner(1);
+
+And finally, to clear the watchlist between scans (useful when scanning articles that widely differ in subject matter or writing style), simply call C<clear_watchlist>
+
+	$scanner->clear_watchlist;
 
 
 =head2 C<summarize>
 
 Summarizing is, not surprisingly, the heart of the Text::Summarizer. Summarizing a body of text provides three distinct categories of information drawn from the existing text and ordered by relevance to the summary: I<full sentences>, I<phrase-fragments / context-free token streams>, and a list of I<frequently occuring words>.
 
-There are three provided functions for summarizing text documents.  $summary   = $summarizer->summarize_text( 'this is a sample text' );
-  $summary   = $summarizer->summarize_file( 'some/file/path.txt' );
-  @summaries = $summarizer->summarize_each( 'some/directory/*' );
-# if no argument provided, defaults to the 'articles_path' attribute   # or their short forms
-  $summary   = $summarizer->summ_text('...');
-  $summary   = $summarizer->summ_file('...');
-  @sumamries = $summarizer->summ_each('...');
-# if no argument provided, defaults to the 'articles_path' attribute
+There are three provided functions for summarizing text documents.
+
+    $summary   = $summarizer->summarize_text( 'this is a sample text' )->summary;
+    $summary   = $summarizer->summarize_file( 'some/file/path.txt' )->summary;
+    @summaries = $summarizer->summarize_each( 'some/glob/*' );    # if no argument provided, defaults to the 'articles_path' attribute'
+
+       # or their short forms
+
+    $summary   = $summarizer->summ_text( '...' )->summary;
+    $summary   = $summarizer->summ_file( '...' )->summary;
+    @sumamries = $summarizer->summ_each( '...' );
 
 C<< summarize_text >> and C<< summarize_file >> each return a summary hash-ref containing three array-refs, while C<< summarize_each >> returns a list of these hash-refs. These summary hashes take the following form:
 
@@ -1202,7 +1061,19 @@ C<fragments> => a list of phrase fragments from the given text, scored similarly
 
 =item *
 
-C<words>   => a list of all words in the text, scored by a three-factor system consisting of  I<frequency of appearance>,  I<population standard deviation>, and  I<use in important phrase fragments>.
+C<words    > => a list of all words in the text, scored by a three-factor system consisting of  I<frequency of appearance>,  I<clustering>, and  I<use in important phrase fragments>.
+
+=item *
+
+C<typed    > => a list of all words in the text, scored syntactically (using the Text::Typifier type_factors attribute).
+
+=item *
+
+C<merged   > => a combination of C<words> and C<typed> scoring, adjusted by a scaling factor.
+
+=item *
+
+C<stemmed  > => as C<merged>, but with all words stemmed and scores merged where stemmed-forms are the same.
 
 =back  
 
@@ -1242,6 +1113,8 @@ when multiple fragments are equivalent (i.e. they consist of the same list of to
 
 =back  
 
+
+
 =head1 SUPPORT
 
 Bugs should always be submitted via the project hosting bug tracker
@@ -1250,13 +1123,19 @@ L<https://github.com/faelin/text-summarizer/issues>
 
 For other issues, contact the maintainer.  
 
+
+
 =head1 AUTHOR
 
 Faelin Landy <faelin.landy@gmail.com> (current maintainer)  
 
+
+
 =head1 CONTRIBUTORS
 
 * Michael McClennen <michaelm@umich.edu>  
+
+
 
 =head1 COPYRIGHT AND LICENSE
 
@@ -1265,5 +1144,6 @@ Copyright (c) 2018 by the AUTHOR as listed above
 This program is free software: you can redistribute it and/or modify it under the terms of the GNU Lesser General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 
 This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public License for more details.
+
 
 =cut

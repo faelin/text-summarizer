@@ -15,6 +15,8 @@ my $builder = Module::Build->new(
         'Types::Standard'     => 0,
         'List::AllUtils'      => 0,
         'Algorithm::CurveFit' => 0,
+        'Lingua::Stem'        => 0,
+
     },
     add_to_cleanup      => [ 'Text::Summarizer-*' ],
     create_makefile_pl => 'traditional',
@@ -23,7 +25,7 @@ my $builder = Module::Build->new(
             repository  => 'https://github.com/faelin/text-summarizer/'
         },
     },
-    configure_requires => { 'Module::Build' => 0.42 }
+    configure_requires => { 'Module::Build' => 2.01 }
 );
 
 $builder->create_build_script();
