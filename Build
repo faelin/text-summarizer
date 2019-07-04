@@ -31,7 +31,7 @@ BEGIN {
   }
   unshift @INC,
     (
-     '/Users/redshirt/perl5/lib/perl5'
+     '~/perl5/lib/perl5'
     );
 }
 

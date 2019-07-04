@@ -1,6 +1,7 @@
 use strict;
 use warnings;
 use Module::Build;
+use Config;
 
 my $builder = Module::Build->new(
     module_name         => 'Text::Summarizer',
@@ -25,8 +26,7 @@ my $builder = Module::Build->new(
             repository  => 'https://github.com/faelin/text-summarizer/'
         },
     },
-    configure_requires => { 'Module::Build' => 2.01 }
+    configure_requires => { 'Module::Build' => 0.4229 }
 );
 
 $builder->create_build_script();
-print "Have a great day!\n";
